@@ -1,0 +1,35 @@
+# Repo anidado (se versiona aparte en tps_RNP)
+_TPS/Laboratorios/
+
+# Videos de clase
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# Datasets
+data/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp

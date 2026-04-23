@@ -1,0 +1,196 @@
+# Rúbrica de corrección — Laboratorio 3
+#
+# Contrato entre el .lab.md (fuente) y la app de corrección:
+#   - `ejercicios` lista todos los ejercicios en el orden en que aparecen en el notebook.
+#   - Cada entrada referencia las celdas por cell_id (estables, generados por lab_build.py).
+#   - `graded_outputs` indica qué tipo de output rendereamos en la UI (para que el docente
+#     decida visualmente) — la IA NO los mira, solo reciben el código y la respuesta de texto.
+#   - `rubric.expected` es un resumen muy corto de qué se espera. `common_errors` lista
+#     errores frecuentes que orientan a la IA a detectar patrones típicos.
+#
+# Este archivo va a estar auto-generado desde el .lab.md en Paso 4. Por ahora, escrito a mano.
+
+lab: 3
+title: "Laboratorio n° 3: Transferencia de conocimiento"
+notebook_enunciado: "_TPS/Laboratorios/Laboratorio_3.ipynb"
+notebook_solucion:  "_TPS/Soluciones/Laboratorio_3_Solucion.ipynb"
+
+ejercicios:
+  - id: ej1
+    titulo: "Cargar ResNet-18 y clasificar una imagen"
+    enunciado_cell: ej1-enunciado
+    code_cell:      ej1-code
+    pregunta_cell:  ej1-pregunta
+    answer_cell:    ej1-respuesta
+    graded_outputs: [text]
+    rubric:
+      expected: >
+        Cargar `models.resnet18(weights='DEFAULT')`, moverla al device, `.eval()`,
+        preprocesar `img_prueba` con `preprocess(size=224)`, forward dentro de `torch.no_grad()`,
+        `torch.softmax(logits, dim=1)`, y `torch.topk(probs, k=5)` para imprimir las top-5
+        clases con sus probabilidades usando `imagenet_classes`.
+      common_errors:
+        - "Olvidar `.eval()` antes de la inferencia (BatchNorm/Dropout en modo train)."
+        - "Usar `torch.max` o `argmax` y quedarse con top-1 en vez de top-5."
+        - "No mover el tensor o el modelo al device."
+        - "Aplicar softmax sobre la dimensión equivocada (p.ej. dim=0)."
+        - "Olvidar el bloque `torch.no_grad()` — no rompe el resultado pero gasta memoria."
+        - "En la respuesta de análisis, mencionar solo Dropout y olvidar BatchNorm (o viceversa)."
+
+  - id: ej2
+    titulo: "Visualizar mapas de activación"
+    enunciado_cell: ej2-enunciado
+    code_cell:      ej2-code
+    pregunta_cell:  ej2-pregunta
+    answer_cell:    ej2-respuesta
+    graded_outputs: [image, text]
+    rubric:
+      expected: >
+        Usar `get_feature_maps(modelo, x, 'layer1')` y `'layer3'`, imprimir la forma de cada
+        tensor, y mostrar los 8 primeros canales en dos grillas 2×4 con `plt.subplots`,
+        `cmap='viridis'`, `ax.axis('off')` y título `f"Canal {i}"`.
+      common_errors:
+        - "No hacer `.detach().cpu().numpy()` antes de `imshow`."
+        - "Usar otro cmap (gray, jet) — válido pero cambia la comparabilidad visual."
+        - "No iterar con `axes.flatten()`."
+        - "Mostrar una sola capa en vez de las dos."
+        - "En el análisis, no conectar la bajada de resolución con strides/pooling."
+
+  - id: ej3
+    titulo: "Optimizar la imagen que activa un filtro"
+    enunciado_cell: ej3-enunciado
+    code_cell:      ej3-code
+    pregunta_cell:  ej3-pregunta
+    answer_cell:    ej3-respuesta
+    graded_outputs: [image]
+    rubric:
+      expected: >
+        Función `visualizar_canal` que inicializa `img` con `torch.randn(...) * 0.1` y
+        `.requires_grad_(True)`, crea `torch.optim.Adam([img], lr=lr, weight_decay=1e-6)`
+        — el ÚNICO parámetro a optimizar es la imagen —, loop con `zero_grad` / forward
+        con `get_feature_maps` / `loss = -feats[0, channel].mean()` (signo NEGATIVO para
+        maximizar) / `backward` / `step`, y retorna `img.detach()`.
+      common_errors:
+        - "CRÍTICO: pasar `model.parameters()` al optimizer (el backbone también se actualiza)."
+        - "CRÍTICO: olvidar el signo menos en la loss — el optimizer minimiza la activación en vez de maximizarla."
+        - "No marcar `requires_grad=True` sobre la imagen."
+        - "No devolver `img.detach()` (al graficar intenta propagar gradientes)."
+        - "Olvidar `optimizer.zero_grad()`."
+        - "En el análisis, confundir quién es el parámetro — los pesos de la red están fijos."
+
+  - id: ej4
+    titulo: "Jerarquía de features: capa temprana vs. profunda"
+    enunciado_cell: ej4-enunciado
+    code_cell:      ej4-code
+    pregunta_cell:  ej4-pregunta
+    answer_cell:    ej4-respuesta
+    graded_outputs: [image]
+    rubric:
+      expected: >
+        Dos llamadas a `visualizar_canal` (layer1 canal 3 y layer4 canal 17) con
+        `num_iters=60`, `lr=0.1`, y mostrar ambas imágenes en `subplots(1, 2)` con
+        `deprocess` y títulos.
+      common_errors:
+        - "Olvidar `deprocess` antes de `imshow` (la imagen se ve deformada por la normalización)."
+        - "`num_iters` muy bajo — los patrones no convergen."
+        - "Mostrar una sola imagen."
+        - "En el análisis, no conectar las diferencias visuales con la profundidad de la capa."
+
+  - id: ej5
+    titulo: "¿Qué imagen activa una clase completa?"
+    enunciado_cell: ej5-enunciado
+    code_cell:      ej5-code
+    pregunta_cell:  ej5-pregunta
+    answer_cell:    ej5-respuesta
+    graded_outputs: [image]
+    rubric:
+      expected: >
+        Función `visualizar_clase` análoga a `visualizar_canal` pero usando
+        `get_feature_maps(model, img)` (sin layer_name → devuelve logits), con
+        `loss = -logits[0, clase_idx]` y probada con dos clases distintas.
+      common_errors:
+        - "Usar probabilidades post-softmax en vez de logits (gradiente ambiguo)."
+        - "Olvidar el signo menos en la loss."
+        - "Pasar `layer_name='fc'` o algo equivalente — no es necesario y puede romper."
+        - "No mostrar dos clases lado a lado."
+        - "En el análisis, no discutir por qué logit es mejor señal que probabilidad."
+
+  - id: ej6
+    titulo: "Preparar los DataLoaders"
+    enunciado_cell: ej6-enunciado
+    code_cell:      ej6-code
+    pregunta_cell:  ej6-pregunta
+    answer_cell:    ej6-respuesta
+    graded_outputs: [text, image]
+    rubric:
+      expected: >
+        `train_tf` con `Resize((224,224))`, `RandomHorizontalFlip`, `RandomVerticalFlip`,
+        `ToTensor`, `Normalize(IMAGENET_MEAN, IMAGENET_STD)`. `test_tf` igual pero sin
+        flips. Dos `EuroSAT` (uno con cada tf) envueltos en `Subset(train_full, train_idx)`
+        / `Subset(test_full, test_idx)`. `DataLoader` batch=64, shuffle True para train /
+        False para test. Visualización de 4 imágenes con desnormalización.
+      common_errors:
+        - "CRÍTICO: normalizar con `[0.5, 0.5, 0.5]` u otra cosa que no sea ImageNet (rompe el fine-tuning)."
+        - "Mismo `transform` para train y test (test con augmentation es no determinista)."
+        - "`shuffle=True` en test."
+        - "Olvidar `RandomVerticalFlip` (válido porque son imágenes cenitales)."
+        - "No desnormalizar antes de `imshow` (los colores aparecen distorsionados)."
+        - "Hacer un solo dataset y aplicarle dos Subsets (el test hereda augmentation de train)."
+
+  - id: ej7
+    titulo: "Construir el modelo de fine-tuning"
+    enunciado_cell: ej7-enunciado
+    code_cell:      ej7-code
+    pregunta_cell:  ej7-pregunta
+    answer_cell:    ej7-respuesta
+    graded_outputs: [text]
+    rubric:
+      expected: >
+        Instanciar `resnet18(weights='DEFAULT')`, leer `in_features = finetune_net.fc.in_features`,
+        reemplazar `fc` por `nn.Linear(in_features, 10)`, inicializar pesos con
+        `nn.init.xavier_uniform_` y bias con ceros, mover al device.
+      common_errors:
+        - "Hardcodear `512` en vez de leer `in_features`."
+        - "No reinicializar la nueva `fc` (queda con la init por defecto de PyTorch, que es razonable pero no es lo pedido)."
+        - "No mover al device después del reemplazo."
+        - "En el análisis, no mencionar que los 1000 logits de ImageNet no tienen correspondencia con las 10 clases de EuroSAT."
+
+  - id: ej8
+    titulo: "Fine-tuning con learning rates diferenciales"
+    enunciado_cell: ej8-enunciado
+    code_cell:      ej8-code
+    pregunta_cell:  ej8-pregunta
+    answer_cell:    ej8-respuesta
+    graded_outputs: [text, image]
+    rubric:
+      expected: >
+        Separar parámetros en `params_backbone` (todo excepto fc) y `params_fc`.
+        `torch.optim.SGD` con dos dicts `{'params': params_backbone}` y
+        `{'params': params_fc, 'lr': lr_base * 10}`, `lr=lr_base=5e-3`, `weight_decay=1e-3`.
+        5 épocas, guardar en `hist_finetune`, plot.
+      common_errors:
+        - "CRÍTICO: un único grupo `optimizer = SGD(finetune_net.parameters(), ...)` — pierde el lr diferencial."
+        - "Lr invertidos: `lr_base` alto para backbone y bajo para fc."
+        - "Usar Adam en vez de SGD."
+        - "No guardar el historial en `hist_finetune` (rompe la comparación del Ej 9)."
+        - "En el análisis, no conectar las dos velocidades con el estado de cada grupo (preentrenado vs. random)."
+
+  - id: ej9
+    titulo: "Comparación: entrenar ResNet-18 desde cero"
+    enunciado_cell: ej9-enunciado
+    code_cell:      ej9-code
+    pregunta_cell:  ej9-pregunta
+    answer_cell:    ej9-respuesta
+    graded_outputs: [text, image]
+    rubric:
+      expected: >
+        `resnet18(weights=None)`, reemplazar `fc` por `Linear(in_features, 10)`, mover al
+        device. Un único grupo de parámetros con `lr=5e-2`, `weight_decay=1e-3`, SGD.
+        5 épocas, `hist_scratch`, plot, e imprimir la comparación de `test_acc` final
+        entre los dos modelos.
+      common_errors:
+        - "Reusar `finetune_net` por error (mismo modelo entrenado dos veces)."
+        - "Olvidar reemplazar la `fc` (queda con 1000 salidas)."
+        - "Usar `lr` muy chico — la red no aprende en 5 épocas."
+        - "No reportar la comparación de exactitudes finales."
+        - "En el análisis, no mencionar que con dataset grande la ventaja del fine-tune se reduce."

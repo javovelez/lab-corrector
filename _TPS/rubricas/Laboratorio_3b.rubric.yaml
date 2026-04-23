@@ -1,0 +1,203 @@
+title: Laboratorio n° 3b
+ejercicios:
+- id: ej1
+  titulo: Matriz de Gram
+  enunciado_cell: ej1-enunciado
+  code_cell: ej1-code
+  pregunta_cell: ej1-pregunta
+  answer_cell: ej1-respuesta
+  graded_outputs:
+  - text
+  rubric:
+    expected: Se espera definir `gram(tensor)` que desempaqueta `B, C, H, W` desde `tensor.shape`, aplana
+      con `tensor.view(B, C, H*W)` y devuelve `torch.bmm(x, x.transpose(1, 2)) / (C*H*W)`. Luego probarla
+      con `torch.randn(2, 4, 8, 8)`, imprimir la forma del resultado (esperado `(2, 4, 4)`) y verificar
+      simetría con `torch.allclose(G, G.transpose(1, 2))`.
+    common_errors:
+    - 'CRÍTICO: No usar `torch.bmm` y terminar con formas mal multiplicadas (por ejemplo usar `@` sobre
+      el tensor 4D sin reshapear, o hacer `x.T` en vez de `x.transpose(1, 2)`), devolviendo un tensor
+      con forma incorrecta.'
+    - Olvidarse de normalizar dividiendo por `C*H*W`, o dividir por otra cosa como `H*W` solamente o `B*C*H*W`,
+      cambiando la escala del resultado.
+    - Aplanar mal el tensor, por ejemplo `tensor.view(B*C, H*W)` o `tensor.view(C, B, H*W)`, perdiendo
+      el eje de batch y rompiendo el `bmm`.
+    - Transponer el eje equivocado (usar `x.transpose(0, 1)` o `x.T`) en lugar de `x.transpose(1, 2)`,
+      produciendo una multiplicación inválida entre batches.
+    - Chequear simetría con `==` o `torch.equal` en vez de `torch.allclose`, dando `False` por errores
+      de punto flotante aunque la matriz sí sea simétrica.
+    - No fijar semilla con `torch.manual_seed(0)` o no imprimir la forma y el chequeo de simetría como
+      pide la consigna.
+- id: ej2
+  titulo: Pérdidas de contenido y estilo sobre features de VGG
+  enunciado_cell: ej2-enunciado
+  code_cell: ej2-code
+  pregunta_cell: ej2-pregunta
+  answer_cell: ej2-respuesta
+  graded_outputs:
+  - text
+  rubric:
+    expected: Se espera implementar `content_loss` que devuelva `mse(feats_gen['relu2_2'], feats_content['relu2_2'])`
+      y `style_loss` que itere sobre las claves de `feats_gen`, calcule la Gram del generado con `gram(...)`
+      y acumule el MSE contra `style_gram[k]` precomputado, devolviendo la suma. El test dummy debe verificar
+      que ambas devuelven escalares no negativos.
+    common_errors:
+    - 'CRÍTICO: Aplicar `gram()` a `style_gram[k]` en `style_loss` (recalcular Gram sobre algo que ya
+      es una matriz de Gram), rompiendo el sentido de la precomputación y dando shapes incorrectos.'
+    - Usar la capa equivocada para contenido (por ejemplo `relu4_3` o `relu1_2` en lugar de `relu2_2`),
+      cambiando el balance perceptual del paper.
+    - Calcular `style_loss` sin aplicar `gram` al generado, comparando features crudas contra matrices
+      de Gram (mismatch de shapes o semántica incorrecta).
+    - Inicializar `total` como tensor con `requires_grad` mal manejado o usar `total += ...` in-place
+      sobre un tensor que rompe el grafo de autograd.
+    - Promediar las pérdidas de estilo en lugar de sumarlas, o iterar solo sobre algunas capas en vez
+      de todas las presentes en `feats_gen`.
+    - Olvidarse de instanciar `mse = nn.MSELoss()` o llamar a `nn.MSELoss(...)` directamente como función
+      pasándole los tensores como argumentos del constructor.
+- id: ej3
+  titulo: Ensamblar la TransformerNet
+  enunciado_cell: ej3-enunciado
+  code_cell: ej3-code
+  pregunta_cell: ej3-pregunta
+  answer_cell: ej3-respuesta
+  rubric:
+    expected: 'Definir `TransformerNetwork` con tres `nn.Sequential`: `ConvBlock` (encoder 3→32→64→128
+      con ConvLayer+ReLU y strides 1,2,2), `ResidualBlock` (5 `ResidualLayer(128, 3)` apilados) y `DeconvBlock`
+      (DeconvLayer 128→64 y 64→32 con stride 2 y output_padding 1 + ReLU, más `ConvLayer(32, 3, 9, 1,
+      norm=''None'')` final sin ReLU). En `forward` encadenar x → ConvBlock → ResidualBlock → DeconvBlock.'
+    common_errors:
+    - 'CRÍTICO: Poner normalización o ReLU en la última ConvLayer(32, 3) del decoder, en vez de usar `norm=''None''`
+      y dejarla sin activación, lo que arruina la imagen de salida.'
+    - Usar menos (o más) de 5 `ResidualLayer` en el `ResidualBlock`, o cambiar los 128 canales internos.
+    - Olvidar el `output_padding=1` en las `DeconvLayer`, rompiendo la recuperación de la resolución original.
+    - Equivocar los strides del encoder (por ejemplo, stride 1 en las tres convs) y no reducir 4× la resolución.
+    - Omitir los `nn.ReLU()` intermedios entre las Conv/DeconvLayer dentro de los `Sequential`.
+    - Desordenar el `forward` o pasar la entrada directamente al `DeconvBlock` sin pasar por `ResidualBlock`.
+- id: ej4
+  titulo: Verificar la arquitectura
+  enunciado_cell: ej4-enunciado
+  code_cell: ej4-code
+  pregunta_cell: ej4-pregunta
+  answer_cell: ej4-respuesta
+  graded_outputs:
+  - text
+  rubric:
+    expected: Instanciar `TransformerNetwork()` en `transformerNet`, imprimir el total de parámetros entrenables
+      con `sum(p.numel() for p in transformerNet.parameters())` (~1.68M), y verificar que `y = transformerNet(x)`
+      con `x = torch.randn(1, 3, 256, 256)` produce una salida de forma idéntica a la entrada. En el análisis,
+      justificar que preservar la forma permite comparar pixel-a-pixel con la pérdida de contenido y que
+      trabajar en resolución reducida abarata cómputo y amplía el campo receptivo efectivo.
+    common_errors:
+    - 'CRÍTICO: que la salida no tenga la misma forma que la entrada (1,3,256,256), indicando un bug en
+      la arquitectura (padding, stride o upsampling mal calibrado) que el alumno no detecta por falta
+      de assert.'
+    - Usar un tensor de entrada con forma equivocada, por ejemplo `torch.randn(3, 256, 256)` sin dimensión
+      de batch o tamaños distintos a 256×256.
+    - Contar parámetros con un método incorrecto (por ejemplo `len(list(transformerNet.parameters()))`
+      o filtrando mal con `requires_grad`) y obtener un número que no se aproxima a 1.68M.
+    - Olvidarse de imprimir la forma de la salida o imprimir `y.shape` sin convertirlo, dificultando la
+      verificación visual.
+    - En el análisis, justificar la preservación de forma sólo por 'estética' sin mencionar la necesidad
+      de comparar pixel-a-pixel en la loss de contenido/perceptual.
+    - En el análisis, no mencionar que el costo de una convolución escala con H·W (ahorro ~16×) ni el
+      aumento del campo receptivo efectivo al operar en resolución reducida.
+- id: ej5
+  titulo: Completar el loop de entrenamiento
+  enunciado_cell: ej5-enunciado
+  code_cell: ej5-code
+  pregunta_cell: ej5-pregunta
+  answer_cell: ej5-respuesta
+  graded_outputs:
+  - text
+  rubric:
+    expected: 'El alumno debe completar tres pasos en el loop: (1) generar el batch estilizado con `generated_batch
+      = net(content_batch)`, (2) obtener `content_features` y `generated_features` pasando cada batch
+      por `VGG` después de `.add(imagenet_neg_mean)`, y (3) computar `c_loss = CONTENT_WEIGHT * content_loss(generated_features,
+      content_features)` y `s_loss = STYLE_WEIGHT * style_loss(generated_features, sg_cur)` para sumarlas
+      en `total_loss`.'
+    common_errors:
+    - 'CRÍTICO: no restar la media de ImageNet con `.add(imagenet_neg_mean)` antes de pasar los batches
+      por VGG, lo que rompe la semántica de las features y hace que las pérdidas no converjan.'
+    - Invertir el orden de argumentos en `content_loss` o `style_loss` (por ejemplo pasar `content_features`
+      como primer argumento en vez de `generated_features`), o comparar `style_loss` contra `style_features`
+      en lugar de contra `style_gram`/`sg_cur`.
+    - 'No recortar la Gram del estilo al batch actual (`sg_cur = {k: v[:cur_bs] ...}`) y pasar `style_gram`
+      completo, rompiendo en la última iteración cuando el batch es menor.'
+    - Olvidar multiplicar las pérdidas por `CONTENT_WEIGHT` y `STYLE_WEIGHT`, con lo que el balance contenido/estilo
+      queda totalmente desbalanceado.
+    - Pasar `content_batch` por la TransformerNet ya con la media restada, o aplicar la resta de media
+      dos veces, corrompiendo la entrada a `net`.
+    - En la respuesta de análisis, no identificar que entrenar la VGG genera una solución trivial (colapso
+      de features a 0) porque la pérdida dejaría de ser una métrica perceptual anclada.
+- id: ej6
+  titulo: Curvas de pérdida
+  enunciado_cell: ej6-enunciado
+  code_cell: ej6-code
+  pregunta_cell: ej6-pregunta
+  answer_cell: ej6-respuesta
+  graded_outputs:
+  - image
+  rubric:
+    expected: Se espera que el alumno arme una figura con `plt.subplots(1, 3, figsize=(15, 4))`, plotee
+      `content_hist`, `style_hist` y `total_hist` en los tres ejes con sus títulos correspondientes, agregue
+      `xlabel` con f-string usando `PRINT_EVERY`, active la grilla y cierre con `tight_layout()` y `show()`.
+      En el análisis debe explicar que content y style están en tensión (tradeoff/Pareto) y que los pesos
+      controlan el balance.
+    common_errors:
+    - 'CRÍTICO: plotear las historias en el eje equivocado o confundir `content_hist`, `style_hist` y
+      `total_hist`, generando gráficos que no se corresponden con los títulos.'
+    - Usar `plt.subplots(3, 1, ...)` o un `figsize` distinto, rompiendo el layout horizontal pedido.
+    - Olvidar `ax.grid(True)` o aplicar la grilla/xlabel a un solo eje en lugar de iterar sobre los tres.
+    - Hardcodear el xlabel (por ejemplo `'checkpoint (cada 50 iters)'`) en vez de usar el f-string con
+      `PRINT_EVERY`.
+    - En el análisis, atribuir la suba de content loss a un bug o mala inicialización en lugar de identificarlo
+      como el tradeoff intrínseco contenido vs estilo mediado por `CONTENT_WEIGHT` y `STYLE_WEIGHT`.
+    - Omitir `plt.tight_layout()` o no poner los títulos exactos (`'Content loss'`, `'Style loss'`, `'Total
+      loss'`).
+- id: ej7
+  titulo: Estilizar imágenes nuevas
+  enunciado_cell: ej7-enunciado
+  code_cell: ej7-code
+  pregunta_cell: ej7-pregunta
+  answer_cell: ej7-respuesta
+  graded_outputs:
+  - image
+  rubric:
+    expected: El alumno debe instanciar TransformerNetwork, cargar los pesos de final.pth con torch.load
+      usando map_location y weights_only=True, mandar al device y poner en eval(). Definir stylize(image_path,
+      max_size=512) que use load_image, itot, forward bajo torch.no_grad() con clamp(0,255) y devuelva
+      (orig_bgr, ttoi(out)). Mostrar 3 imágenes random de val2017 en grilla 3x2 convirtiendo BGR a RGB
+      y casteando la estilizada a uint8.
+    common_errors:
+    - 'CRÍTICO: olvidarse del torch.no_grad() en la inferencia, lo que consume memoria innecesaria y puede
+      romper en imágenes grandes.'
+    - No llamar a model.eval(), dejando BatchNorm/Dropout en modo entrenamiento y alterando la salida
+      estilizada.
+    - No hacer clamp(0, 255) o no castear a uint8 antes de imshow, mostrando imágenes saturadas, con warnings
+      o colores incorrectos.
+    - Omitir la conversión BGR→RGB con cv2.cvtColor, lo que invierte los canales rojo y azul en la visualización.
+    - No mandar el tensor y/o el modelo al device correcto, provocando mismatch entre CPU y GPU.
+    - Cargar los pesos sin map_location ni weights_only, o instanciar mal el modelo antes de load_state_dict.
+- id: ej8
+  titulo: Comparación Gatys vs. Johnson
+  enunciado_cell: ej8-enunciado
+  answer_cell: ej8-respuesta
+  rubric:
+    expected: El alumno debe responder las 4 preguntas contrastando Gatys (optimización directa, segundos-minutos
+      por imagen, gratis probar estilos nuevos) vs Johnson (forward pass en milisegundos pero requiere
+      entrenar una red por estilo, ~5 min sobre COCO val2017 con T4), reconociendo ventajas de calidad/interpretabilidad
+      de Gatys y de velocidad/consistencia temporal de Johnson, y eligiendo Gatys para el artista multi-estilo
+      y Johnson para la app móvil de video en tiempo real, con justificación basada en dónde se amortiza
+      el costo.
+    common_errors:
+    - 'CRÍTICO: invertir la elección en el punto 4 (Johnson para el artista, Gatys para el video en tiempo
+      real) por no entender dónde se amortiza el costo computacional.'
+    - Confundir el costo de entrenamiento con el costo de inferencia en Johnson, afirmando que Johnson
+      es lento por imagen o que Gatys requiere entrenamiento previo.
+    - Omitir mencionar el tiempo concreto del entrenamiento propio de la TransformerNet (~5 min sobre
+      COCO val2017 con T4) que pide explícitamente la consigna.
+    - Afirmar que Johnson soporta múltiples estilos sin más, sin aclarar que el Johnson vanilla es mono-estilo
+      y que existen variantes multi-estilo (AdaIN, Dumoulin).
+    - Dar ventajas de calidad genéricas sin distinguir dimensiones concretas (match perceptual fino e
+      interpretabilidad para Gatys; consistencia temporal y robustez para Johnson).
+    - Responder de forma superficial o incompleta, sin contrastar los dos métodos en cada una de las 4
+      dimensiones pedidas.
