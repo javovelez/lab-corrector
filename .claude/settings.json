@@ -49,7 +49,11 @@
       "Bash(python3 -c \"import ast; ast.parse\\(open\\('app/main.py'\\).read\\(\\)\\); ast.parse\\(open\\('app/state.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
       "Bash(python3 -c \"import ast; [ast.parse\\(open\\(f\\).read\\(\\)\\) for f in ['app/state.py','app/export.py','app/main.py']]; print\\('OK'\\)\")",
       "Bash(python3 -c \"import ast; [ast.parse\\(open\\(f\\).read\\(\\)\\) for f in ['app/main.py','app/export.py']]; print\\('OK'\\)\")",
-      "Bash(python3 -c \"import ast; [ast.parse\\(open\\(f\\).read\\(\\)\\) for f in ['app/main.py','app/state.py']]; print\\('OK'\\)\")"
+      "Bash(python3 -c \"import ast; [ast.parse\\(open\\(f\\).read\\(\\)\\) for f in ['app/main.py','app/state.py']]; print\\('OK'\\)\")",
+      "Bash(python3 tools/lab_build.py _TPS/sources/Laboratorio_4b.lab.md)",
+      "Read(//Library/Frameworks/Python.framework/**)",
+      "Bash(zip -qr BCCD_yolo.zip BCCD/)",
+      "Bash(unzip -l BCCD_yolo.zip)"
     ]
   }
 }

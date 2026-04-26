@@ -2,6 +2,8 @@
 
 Este documento describe con exactitud el formato, la estructura y las convenciones de escritura utilizadas en todos los trabajos prácticos de la materia. Debe consultarse antes de redactar cualquier laboratorio nuevo para garantizar coherencia en la serie.
 
+> **Nota:** esta guía cubre el aspecto **visual/textual** de los notebooks. Para el formato de fuente única `.lab.md`, la rúbrica YAML, la convención de `cell_id` y la app de corrección, ver el wiki técnico en [../docs/](../docs/README.md).
+
 ---
 
 ## Estructura de directorios
