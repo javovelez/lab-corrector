@@ -8,7 +8,10 @@ prompt → texto.
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 from textwrap import dedent
+from typing import TypedDict
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -188,3 +191,197 @@ def generate_draft(prompt: str) -> str:
         raise
     except Exception as e:
         raise ClaudeSDKError(f"Fallo inesperado al llamar al SDK: {e}") from e
+
+
+# ─── Batch (todos los grupos para un mismo ítem en una sola llamada) ─────────
+
+class GroupEntrega(TypedDict, total=False):
+    """Datos de un grupo para un ítem dado, listos para meter en el batch.
+
+    `grupo_id` se usa como clave en el JSON de salida. El resto depende del
+    `item_tipo`: para "código" se usa `entrega_src` + `entrega_text_outputs`;
+    para "análisis", la respuesta del alumno va en `entrega_src` y el código
+    del mismo ejercicio del grupo (contexto) va en `codigo_ctx_entrega` +
+    `codigo_ctx_outputs`.
+    """
+    grupo_id: str
+    entrega_src: str
+    entrega_text_outputs: str
+    codigo_ctx_entrega: str
+    codigo_ctx_outputs: str
+
+
+def build_batch_prompt(
+    *,
+    ej_titulo: str,
+    item_tipo: str,
+    expected: str,
+    common_errors: list[str],
+    enunciado_src: str,
+    pregunta_src: str,
+    solucion_src: str,
+    codigo_ctx_solucion: str = "",
+    grupos: list[GroupEntrega],
+) -> str:
+    """Arma un prompt que evalúa N grupos contra la misma rúbrica.
+
+    El contexto del ejercicio (enunciado, qué se espera, errores frecuentes,
+    solución oficial) se manda UNA SOLA VEZ. Después siguen las entregas
+    etiquetadas por `grupo_id`, y se pide salida JSON con una clave por
+    grupo. La respuesta esperada para grupos correctos es exactamente "OK".
+    """
+    errores_block = "\n".join(f"- {e}" for e in common_errors) or "(sin lista)"
+
+    if item_tipo == "análisis":
+        enunciado_block = pregunta_src.strip() or enunciado_src.strip()
+    else:
+        enunciado_block = enunciado_src.strip()
+
+    tipo_label = "código" if item_tipo == "código" else "respuesta de análisis"
+
+    shared_sections: list[tuple[str, str]] = [
+        ("ENUNCIADO", enunciado_block),
+        ("QUÉ SE ESPERA", expected.strip()),
+        ("ERRORES FRECUENTES A TENER EN CUENTA", errores_block),
+        ("SOLUCIÓN OFICIAL", solucion_src.strip() or "(no definida)"),
+    ]
+    if item_tipo == "análisis" and codigo_ctx_solucion.strip():
+        shared_sections.append((
+            "CÓDIGO DEL EJERCICIO — SOLUCIÓN OFICIAL (contexto)",
+            codigo_ctx_solucion.strip(),
+        ))
+
+    shared_block = "\n\n".join(
+        f"{title}\n{'=' * len(title)}\n{content}" for title, content in shared_sections
+    )
+
+    # Bloque por grupo. Para cada uno repetimos solo lo que es propio del
+    # grupo: la entrega y, según el tipo, sus outputs o el código de contexto.
+    grupo_blocks: list[str] = []
+    for g in grupos:
+        gid = g["grupo_id"]
+        parts = [f"--- {gid} ---"]
+        entrega_src = (g.get("entrega_src") or "").strip()
+        parts.append("ENTREGA:")
+        parts.append(entrega_src or "(vacía)")
+        if item_tipo == "código":
+            outs = (g.get("entrega_text_outputs") or "").strip()
+            parts.append("OUTPUTS DE TEXTO:")
+            parts.append(
+                outs if outs
+                else "(la celda no produjo outputs — no hay prints, ni errores, ni resultado)"
+            )
+        else:
+            ctx_e = (g.get("codigo_ctx_entrega") or "").strip()
+            if ctx_e:
+                parts.append("CÓDIGO DEL EJERCICIO — ENTREGA DEL GRUPO (contexto):")
+                parts.append(ctx_e)
+            ctx_o = (g.get("codigo_ctx_outputs") or "").strip()
+            if ctx_o:
+                parts.append("OUTPUTS DE TEXTO DEL CÓDIGO DEL GRUPO (contexto):")
+                parts.append(ctx_o)
+        grupo_blocks.append("\n".join(parts))
+
+    grupos_block = "\n\n".join(grupo_blocks)
+    grupo_ids = [g["grupo_id"] for g in grupos]
+    ejemplo_keys = ", ".join(f'"{gid}": "..."' for gid in grupo_ids[:2]) or '"grupo_01": "..."'
+
+    if item_tipo == "código":
+        scope = (
+            "Estás corrigiendo la CELDA DE CÓDIGO de cada grupo. Si QUÉ "
+            "SE ESPERA describe pasos concretos (construir datos, aplicar "
+            "un kernel, imprimir, graficar, comparar con un valor de "
+            "referencia) y esos pasos no aparecen en la entrega ni en sus "
+            "outputs, señalalo — aunque la parte que sí escribieron esté "
+            "bien. Una celda sin outputs suele indicar que no la "
+            "ejecutaron o que saltearon pasos pedidos."
+        )
+    else:
+        scope = (
+            "Estás corrigiendo SOLO la respuesta de análisis (prosa) de "
+            "cada grupo. El código que ves aparece como contexto para "
+            "entender la pregunta; NO señales errores del código ni pasos "
+            "faltantes del código salvo que la pregunta pida discutir "
+            "algo del código. Evaluá si la respuesta cubre lo que pide la "
+            "pregunta y si lo que afirma es correcto."
+        )
+
+    independencia = (
+        "EVALUÁ CADA ENTREGA DE FORMA INDEPENDIENTE contra la rúbrica. "
+        "No compares las entregas entre sí: aunque varios grupos cometan "
+        "el mismo error, señalalo en cada uno con el mismo nivel de "
+        "detalle. El que muchos grupos estén bien no te baja el listón, "
+        "y que muchos estén mal no te lo sube. La rúbrica es la única "
+        "vara."
+    )
+
+    output_spec = (
+        "Devolveme un único objeto JSON con una clave por grupo y como "
+        "valor el borrador de observación (o 'OK' si la entrega cumple "
+        "la rúbrica). Forma exacta:\n"
+        f"{{ {ejemplo_keys}, ... }}\n\n"
+        "Reglas de salida:\n"
+        "- Si la entrega del grupo cumple lo pedido y no hay nada que "
+        "señalar, el valor debe ser exactamente la cadena \"OK\" (sin "
+        "punto, sin nada más).\n"
+        "- Si hay algo que señalar, redactá el borrador siguiendo las "
+        "reglas de estilo del system prompt (1 a 4 oraciones, dirigido "
+        "al grupo en plural con \"ustedes\", solo señalando errores sin "
+        "dar instrucciones de cómo arreglarlos).\n"
+        "- Devolvé SOLO el JSON. Sin texto antes ni después, sin "
+        "markdown fences, sin comentarios.\n"
+        f"- Las claves del JSON deben ser exactamente: {', '.join(grupo_ids)}."
+    )
+
+    header = (
+        f"Ejercicio: {ej_titulo}\nCorrigiendo: {tipo_label} de "
+        f"{len(grupos)} grupos en una sola pasada.\n\n{independencia}"
+    )
+    footer = f"{scope}\n\n{output_spec}"
+
+    return (
+        f"{header}\n\n{shared_block}\n\nENTREGAS DE LOS GRUPOS\n"
+        f"======================\n\n{grupos_block}\n\n{footer}"
+    )
+
+
+def _extract_json_object(raw: str) -> dict:
+    """Extrae un dict JSON de una respuesta del modelo.
+
+    Tolera markdown fences (```json ... ```), texto antes o después, y
+    espacios. Lanza `ValueError` si no encuentra JSON parseable.
+    """
+    text = raw.strip()
+    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, flags=re.DOTALL)
+    if fence:
+        text = fence.group(1)
+    else:
+        # Recortamos al primer `{` y al último `}` para tolerar prosa.
+        first = text.find("{")
+        last = text.rfind("}")
+        if first == -1 or last == -1 or last <= first:
+            raise ValueError("No encontré un objeto JSON en la respuesta.")
+        text = text[first : last + 1]
+    parsed = json.loads(text)
+    if not isinstance(parsed, dict):
+        raise ValueError("La respuesta no es un objeto JSON.")
+    return parsed
+
+
+def generate_batch_drafts(prompt: str, expected_keys: list[str]) -> dict[str, str]:
+    """Ejecuta el batch y devuelve `{grupo_id: texto}`.
+
+    `expected_keys` se usa para validar la salida y para tolerar el caso
+    en que el modelo se saltee algún grupo: las claves faltantes quedan
+    fuera del dict (el caller decide si reintenta esos grupos sueltos).
+    Lanza `ClaudeSDKError` si el SDK falla o `ValueError` si la salida
+    no es un JSON parseable.
+    """
+    raw = generate_draft(prompt)
+    parsed = _extract_json_object(raw)
+    out: dict[str, str] = {}
+    for k in expected_keys:
+        v = parsed.get(k)
+        if isinstance(v, str):
+            out[k] = v.strip()
+    return out

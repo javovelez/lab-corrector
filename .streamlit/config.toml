@@ -1,0 +1,16 @@
+[theme]
+base = "light"
+
+# Fondo principal de la app — crema cálido. Combina con la paleta pastel
+# de la matriz (verde A5D6A7, amarillo FFE082, rojo EF9A9A, gris E0E0E0).
+backgroundColor = "#F8F5EE"
+
+# Fondo de sidebar y de inputs/widgets. Un tono más oscuro que el principal
+# para que se note el borde sin chocar.
+secondaryBackgroundColor = "#EFEAE0"
+
+# Color de acento — sage neutro, no compite con los semáforos verde/rojo.
+primaryColor = "#7B8B6F"
+
+textColor = "#2B2B2B"
+font = "sans serif"

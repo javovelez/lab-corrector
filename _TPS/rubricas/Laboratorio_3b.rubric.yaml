@@ -57,8 +57,6 @@ ejercicios:
   titulo: Ensamblar la TransformerNet
   enunciado_cell: ej3-enunciado
   code_cell: ej3-code
-  pregunta_cell: ej3-pregunta
-  answer_cell: ej3-respuesta
   rubric:
     expected: 'Definir `TransformerNetwork` con tres `nn.Sequential`: `ConvBlock` (encoder 3→32→64→128
       con ConvLayer+ReLU y strides 1,2,2), `ResidualBlock` (5 `ResidualLayer(128, 3)` apilados) y `DeconvBlock`
@@ -84,8 +82,7 @@ ejercicios:
     expected: Instanciar `TransformerNetwork()` en `transformerNet`, imprimir el total de parámetros entrenables
       con `sum(p.numel() for p in transformerNet.parameters())` (~1.68M), y verificar que `y = transformerNet(x)`
       con `x = torch.randn(1, 3, 256, 256)` produce una salida de forma idéntica a la entrada. En el análisis,
-      justificar que preservar la forma permite comparar pixel-a-pixel con la pérdida de contenido y que
-      trabajar en resolución reducida abarata cómputo y amplía el campo receptivo efectivo.
+      justificar que preservar la forma permite comparar pixel-a-pixel con la pérdida de contenido.
     common_errors:
     - 'CRÍTICO: que la salida no tenga la misma forma que la entrada (1,3,256,256), indicando un bug en
       la arquitectura (padding, stride o upsampling mal calibrado) que el alumno no detecta por falta
@@ -98,8 +95,6 @@ ejercicios:
       verificación visual.
     - En el análisis, justificar la preservación de forma sólo por 'estética' sin mencionar la necesidad
       de comparar pixel-a-pixel en la loss de contenido/perceptual.
-    - En el análisis, no mencionar que el costo de una convolución escala con H·W (ahorro ~16×) ni el
-      aumento del campo receptivo efectivo al operar en resolución reducida.
 - id: ej5
   titulo: Completar el loop de entrenamiento
   enunciado_cell: ej5-enunciado
@@ -177,27 +172,3 @@ ejercicios:
     - Omitir la conversión BGR→RGB con cv2.cvtColor, lo que invierte los canales rojo y azul en la visualización.
     - No mandar el tensor y/o el modelo al device correcto, provocando mismatch entre CPU y GPU.
     - Cargar los pesos sin map_location ni weights_only, o instanciar mal el modelo antes de load_state_dict.
-- id: ej8
-  titulo: Comparación Gatys vs. Johnson
-  enunciado_cell: ej8-enunciado
-  answer_cell: ej8-respuesta
-  rubric:
-    expected: El alumno debe responder las 4 preguntas contrastando Gatys (optimización directa, segundos-minutos
-      por imagen, gratis probar estilos nuevos) vs Johnson (forward pass en milisegundos pero requiere
-      entrenar una red por estilo, ~5 min sobre COCO val2017 con T4), reconociendo ventajas de calidad/interpretabilidad
-      de Gatys y de velocidad/consistencia temporal de Johnson, y eligiendo Gatys para el artista multi-estilo
-      y Johnson para la app móvil de video en tiempo real, con justificación basada en dónde se amortiza
-      el costo.
-    common_errors:
-    - 'CRÍTICO: invertir la elección en el punto 4 (Johnson para el artista, Gatys para el video en tiempo
-      real) por no entender dónde se amortiza el costo computacional.'
-    - Confundir el costo de entrenamiento con el costo de inferencia en Johnson, afirmando que Johnson
-      es lento por imagen o que Gatys requiere entrenamiento previo.
-    - Omitir mencionar el tiempo concreto del entrenamiento propio de la TransformerNet (~5 min sobre
-      COCO val2017 con T4) que pide explícitamente la consigna.
-    - Afirmar que Johnson soporta múltiples estilos sin más, sin aclarar que el Johnson vanilla es mono-estilo
-      y que existen variantes multi-estilo (AdaIN, Dumoulin).
-    - Dar ventajas de calidad genéricas sin distinguir dimensiones concretas (match perceptual fino e
-      interpretabilidad para Gatys; consistencia temporal y robustez para Johnson).
-    - Responder de forma superficial o incompleta, sin contrastar los dos métodos en cada una de las 4
-      dimensiones pedidas.
