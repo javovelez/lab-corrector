@@ -53,7 +53,8 @@
       "Bash(python3 tools/lab_build.py _TPS/sources/Laboratorio_4b.lab.md)",
       "Read(//Library/Frameworks/Python.framework/**)",
       "Bash(zip -qr BCCD_yolo.zip BCCD/)",
-      "Bash(unzip -l BCCD_yolo.zip)"
+      "Bash(unzip -l BCCD_yolo.zip)",
+      "Bash(python3 tools/lab_build.py _TPS/sources/Laboratorio_4a.lab.md)"
     ]
   }
 }

@@ -176,6 +176,25 @@ NUM_CLASSES  = len(PET_CLASSES)   # 2
 IGNORE_INDEX = 255                # los píxeles de borde no se evalúan
 
 print(f"Clases ({NUM_CLASSES}): {PET_CLASSES}")
+
+
+# ─── Helper para visualización: leyenda con colores de las clases ──────────
+# Se usa en el Ej. 10. Pega una fila de cuadritos coloreados arriba de la
+# figura asociando cada color de PET_COLORMAP a su nombre de clase, más un
+# cuadrito gris para los píxeles `ignore`.
+from matplotlib.patches import Patch
+
+def add_seg_legend(fig, class_names=PET_CLASSES, colormap=PET_COLORMAP):
+    """Agrega una leyenda global a fig con los colores de las clases."""
+    handles = [
+        Patch(facecolor=tuple(c / 255 for c in colormap[i]),
+              edgecolor='black', label=class_names[i])
+        for i in range(len(class_names))
+    ]
+    handles.append(Patch(facecolor=(0.5, 0.5, 0.5),
+                         edgecolor='black', label='ignore (borde)'))
+    fig.legend(handles=handles, loc='upper center',
+               ncol=len(handles), bbox_to_anchor=(0.5, 1.0))
 ```
 ::::
 
@@ -503,13 +522,15 @@ Las piezas son cinco:
 
 Implementá una clase `SimpleConvolution` (subclase de `nn.Module`) cuyo constructor reciba la cantidad de canales de entrada y la cantidad de canales de salida. El bloque tiene que aplicar, en orden:
 
-1. Una primera convolución 3×3 sin padding que mapee de los canales de entrada a los de salida, seguida de una ReLU.
-2. Una segunda convolución 3×3 sin padding que mantenga la cantidad de canales (entrada y salida igual a los canales de salida del paso anterior), seguida de otra ReLU.
+1. Una primera convolución 3×3 sin padding que mapee de los canales de entrada a los de salida, seguida de una **BatchNorm 2D** sobre los canales de salida y una ReLU.
+2. Una segunda convolución 3×3 sin padding que mantenga la cantidad de canales (entrada y salida igual a los canales de salida del paso anterior), seguida de otra BatchNorm 2D y otra ReLU.
 3. Un dropout con probabilidad 0.1 al final.
 
-Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, c_out, H-4, W-4)` — cada convolución 3×3 sin padding resta 2 a cada dimensión espacial.
+Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, c_out, H-4, W-4)` — cada convolución 3×3 sin padding resta 2 a cada dimensión espacial. La BatchNorm y la ReLU no cambian la forma del tensor.
 
 > **Pista:** Podés guardar la pila de capas en un `nn.Sequential` dentro de `__init__` y que `forward` sea casi trivial.
+
+> **Nota sobre BatchNorm:** la U-Net del paper original (2015) **no usa BatchNorm** — la técnica recién se popularizó después y los notebooks viejos suelen omitirla. La realidad es que sin BN una U-Net entrenada **desde cero** sobre datasets chicos cuesta mucho convergir: los gradientes se atenúan al pasar por las 9 capas profundas y la red termina en mínimos triviales (predecir siempre la clase mayoritaria del crop). Hoy todas las implementaciones modernas incluyen BatchNorm después de cada Conv2d. Lo agregamos por la misma razón.
 ::::
 
 
@@ -521,7 +542,7 @@ Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, c_out,
 ```python solution
 class SimpleConvolution(nn.Module):
     """
-    Doble convolución 3x3 sin padding + ReLU + Dropout(0.1).
+    Doble (Conv 3x3 + BatchNorm + ReLU) + Dropout(0.1).
     Es el bloque que aparece en cada nivel de la U-Net.
 
     Entrada: (B, input_channel, H, W)
@@ -530,13 +551,19 @@ class SimpleConvolution(nn.Module):
     def __init__(self, input_channel, output_channel):
         super().__init__()
         # Sin padding: por eso H y W bajan en 2 con cada conv 3x3.
+        # BatchNorm después de cada Conv2d: estabiliza los gradientes en redes
+        # profundas. La U-Net original del paper (2015) no la usaba pero hoy
+        # es estándar — sin BN la red entrenada desde cero converge a soluciones
+        # triviales como "predecir siempre la clase mayoritaria del crop".
         # Dropout suave (0.1): este bloque se usa 9 veces a lo largo de la
-        # U-Net, así que un dropout chico se acumula bastante. Subirlo a
-        # 0.2 ahoga la señal y dificulta que la red aprenda desde scratch.
+        # U-Net, así que un dropout chico se acumula. Subirlo a 0.2 ahoga la
+        # señal y dificulta el aprendizaje desde scratch.
         self.block = nn.Sequential(
             nn.Conv2d(input_channel, output_channel, kernel_size=3),
+            nn.BatchNorm2d(output_channel),
             nn.ReLU(inplace=False),
             nn.Conv2d(output_channel, output_channel, kernel_size=3),
+            nn.BatchNorm2d(output_channel),
             nn.ReLU(inplace=False),
             nn.Dropout(p=0.1),
         )
@@ -1282,13 +1309,15 @@ Ya tenemos un modelo entrenado. Vamos a usarlo para producir máscaras predichas
 1. Implementá una función `label2image` que reciba un tensor 2D `(H, W)` con índices de clase y devuelva un tensor 3D `(H, W, 3)` con los colores RGB correspondientes según `PET_COLORMAP`. Para los píxeles marcados como `IGNORE_INDEX`, podés pintar un color "neutro" (gris) — no es crítico porque son pocos.
 2. Tomá 4 imágenes del split de test con la función que implementaste en el Ej. 1.
 3. Para cada imagen:
-   - Recortá un parche 316×316 desde la esquina superior izquierda, tanto en la imagen como en el trimap correspondiente. Necesitamos ese tamaño porque es el que espera la red.
+   - Recortá un parche 316×316 **desde el centro** de la imagen, tanto en la imagen como en el trimap correspondiente. Centrar el recorte (en lugar de tomarlo desde una esquina) maximiza la chance de que la mascota quede dentro del cuadro evaluado — en Pet los animales suelen estar centrados en la foto.
    - Normalizá la imagen con la misma media/std de ImageNet que usaba el dataset durante el entrenamiento.
    - Pasala por la red en modo eval, dentro de un bloque `no_grad`, y quedate con la clase de mayor logit por píxel (`argmax` sobre la dimensión de canales).
    - Convertí la predicción a imagen RGB con `label2image`. Hacé lo mismo con el ground truth: ojo que el trimap viene con valores `{1, 2, 3}` y nuestro modelo predice `{0, 1}` — vas a tener que aplicar el mismo mapeo que hace el `PetSegDataset` (`2→0`, `1→1`, `3→IGNORE_INDEX`) antes de visualizar. Y antes de mostrar, recortá el ground truth al centro 132×132 con `crop_img` para que coincida con el tamaño de la predicción.
-4. Armá una grilla con tantas filas como imágenes y tres columnas: imagen original (cropeada a 316), predicción (132×132) y ground truth (132×132).
+   - **Recortá también la imagen** (la del crop 316×316) **al centro 132×132** antes de mostrarla. Sin esto, la imagen se mostraría más grande que la pred y el GT y los tres cuadros no estarían a la misma escala visual: la pred 132×132 cubre solo el centro 132×132 del crop 316×316 que vio la red, así que mostrar también ese centro hace que las tres visualizaciones se correspondan pixel a pixel.
+4. Armá una grilla con tantas filas como imágenes y tres columnas: imagen (132×132), predicción (132×132) y ground truth (132×132). Las tres a la misma escala.
+5. Llamá a `add_seg_legend(fig)` (helper preescrito en el setup) para que la figura tenga arriba una leyenda con el color de cada clase. Sin la leyenda mirando la grilla no se sabe qué clase representa cada color.
 
-> **Pista:** En `torchvision.transforms.functional` hay una función `crop` que toma una imagen y devuelve un crop a partir de coordenadas `top`, `left`, `height` y `width`. Es lo más cómodo para hacer el recorte fijo desde la esquina superior izquierda — con `top=0, left=0` te alcanza.
+> **Pista:** En `torchvision.transforms.functional` hay una función `crop` que toma una imagen y devuelve un crop a partir de coordenadas `top`, `left`, `height` y `width`. Para centrar el crop usá `top = (H - 316) // 2` y `left = (W - 316) // 2`. Para recortar la imagen al centro 132×132 al final podés reusar `crop_img` también — total ya la tenés a mano y hace exactamente eso.
 ::::
 
 
@@ -1339,9 +1368,8 @@ norm = transforms.Normalize(mean=[0.485, 0.456, 0.406],
 fig, axs = plt.subplots(n, 3, figsize=(12, 4 * n))
 with torch.no_grad():
     for i in range(n):
-        # Crop fijo 316x316 desde la esquina superior izquierda. Si la imagen
-        # es más chica que 316 hacemos un resize previo (mismo trato que el
-        # dataset) para evitar errores.
+        # Si la imagen es más chica que 316 en alguna dimensión, hacemos un
+        # resize previo (mismo trato que el dataset) para evitar errores.
         img_t = test_imgs[i]
         msk_t = test_masks[i].squeeze(0)  # (1, H, W) → (H, W)
         H, W = img_t.shape[1], img_t.shape[2]
@@ -1352,23 +1380,38 @@ with torch.no_grad():
             msk_t = transforms.functional.resize(
                 msk_t.unsqueeze(0), [int(H * f), int(W * f)],
                 interpolation=transforms.InterpolationMode.NEAREST).squeeze(0)
-        img_crop  = transforms.functional.crop(img_t, 0, 0, 316, 316)
-        mask_crop = transforms.functional.crop(msk_t, 0, 0, 316, 316).long()
+            H, W = img_t.shape[1], img_t.shape[2]
+
+        # Crop CENTRADO 316x316: maximiza la chance de que la mascota quede
+        # dentro del cuadro evaluado (las imágenes de Pet suelen tener al
+        # animal cerca del centro, no en una esquina).
+        top  = (H - 316) // 2
+        left = (W - 316) // 2
+        img_crop  = transforms.functional.crop(img_t, top, left, 316, 316)
+        mask_crop = transforms.functional.crop(msk_t, top, left, 316, 316).long()
 
         # Normalizo la imagen como en el train y paso por la red.
         X = norm(img_crop.float() / 255).unsqueeze(0).to(device)
         y_hat = model(X)                          # (1, NC, 132, 132)
         pred  = y_hat.argmax(dim=1).squeeze(0)    # (132, 132)
 
-        # Ground truth: trimap → índices del modelo, después crop al centro.
+        # Ground truth: trimap → índices, después crop al centro 132x132 para
+        # que coincida con el tamaño de la predicción.
         gt_idx = trimap_to_index(mask_crop)       # (316, 316)
+        target_shape = torch.zeros(1, 1, 132, 132)
         gt_idx_cropped = crop_img(
-            gt_idx.unsqueeze(0).unsqueeze(0),
-            torch.zeros(1, 1, 132, 132)
+            gt_idx.unsqueeze(0).unsqueeze(0), target_shape
         ).squeeze(0).squeeze(0)
 
-        axs[i, 0].imshow(img_crop.permute(1, 2, 0))
-        axs[i, 0].set_title("Imagen (316x316)")
+        # Recorto la imagen al centro 132x132 también, para que las tres
+        # visualizaciones (imagen, pred, GT) estén a la misma escala y se
+        # correspondan pixel a pixel.
+        img_centered = crop_img(
+            img_crop.unsqueeze(0).float(), target_shape
+        ).squeeze(0).byte()
+
+        axs[i, 0].imshow(img_centered.permute(1, 2, 0))
+        axs[i, 0].set_title("Imagen (132x132)")
         axs[i, 0].axis('off')
         axs[i, 1].imshow(label2image(pred))
         axs[i, 1].set_title("Predicción (132x132)")
@@ -1377,7 +1420,10 @@ with torch.no_grad():
         axs[i, 2].set_title("Ground truth (132x132)")
         axs[i, 2].axis('off')
 
-plt.tight_layout()
+# ─── Leyenda global con los colores de las clases (helper preescrito) ─────
+add_seg_legend(fig)
+
+plt.tight_layout(rect=[0, 0, 1, 0.97])  # deja espacio arriba para la leyenda
 plt.show()
 ```
 ::::

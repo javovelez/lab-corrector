@@ -65,7 +65,7 @@ En el campo conviven cuatro familias principales. Es importante saber qué hay p
 
 > **Nota sobre licencia:** la implementación de Ultralytics está bajo **AGPL-3.0**. Para uso educativo y prototipado no hay problema. Si más adelante usás YOLO en un producto comercial cerrado, vas a tener que evaluar licenciamiento (Ultralytics ofrece licencia comercial paga, o existen forks bajo licencias permisivas).
 
-> **Importante — GPU:** este laboratorio fine-tunea un modelo sobre cientos de imágenes. **Activá la GPU en Colab** antes de empezar: *Entorno de ejecución > Cambiar tipo de entorno de ejecución > GPU (T4)*. Sin GPU el entrenamiento es impracticable (horas en lugar de minutos).
+> **Importante — GPU:** en este laboratorio se realiza fine-tuning de un modelo sobre cientos de imágenes. **Activá la GPU en Colab** antes de empezar: *Entorno de ejecución > Cambiar tipo de entorno de ejecución > GPU (T4)*. Sin GPU el entrenamiento es impracticable (horas en lugar de minutos).
 
 ---
 
@@ -192,7 +192,7 @@ for split in ['train', 'val', 'test']:
 ---
 ## Sección A: Inferencia con YOLO preentrenado
 
-Antes de fine-tunear nada, vamos a usar el modelo "tal cual viene" para detectar objetos en imágenes arbitrarias. Esto cumple dos roles: por un lado, ver lo impresionante que es un detector moderno preentrenado; por otro, familiarizarnos con la API de `ultralytics` que después usamos para entrenar.
+Antes de realizar fine-tuning, vamos a usar el modelo "tal cual viene" para detectar objetos en imágenes arbitrarias. Esto cumple dos roles: por un lado, ver lo impresionante que es un detector moderno preentrenado; por otro, familiarizarnos con la API de `ultralytics` que después usamos para entrenar.
 ::::
 
 
@@ -327,7 +327,7 @@ Una "ventana", una "rueda" o un "espejo" no están en ese vocabulario, así que 
    - `conf=0.10` (laxo: deja pasar muchas cajas)
    - `conf=0.70` (estricto: solo cajas muy seguras)
    Mostrá las dos imágenes lado a lado y reportá cuántas detecciones hay en cada caso.
-2. Hacé lo mismo variando el threshold IoU del NMS:
+2. Hacé lo mismo variando el threshold IoU del NMS, pero **bajando la confianza a `conf=0.05`** para que el modelo exponga muchas cajas candidatas (con la confianza por defecto, la mayoría de las cajas duplicadas ya se descartan antes de NMS y no se ve la diferencia):
    - `iou=0.30` (estricto: descarta agresivamente cajas superpuestas)
    - `iou=0.80` (laxo: solo descarta si las cajas casi se superponen totalmente)
    Mostrá las dos imágenes lado a lado y reportá la cantidad de cajas en cada caso.
@@ -366,8 +366,13 @@ plt.show()
 # NMS recorre las cajas de mayor a menor confianza y elimina aquellas que
 # tengan IoU > umbral con una caja ya seleccionada. `iou` bajo es estricto
 # (suprime más); `iou` alto es laxo (suprime menos).
-res_strict = model(img_url, iou=0.30, verbose=False)[0]
-res_lax    = model(img_url, iou=0.80, verbose=False)[0]
+#
+# IMPORTANTE: bajamos `conf` a 0.05 para que el modelo entregue muchas cajas
+# crudas. Con la confianza por defecto (0.25) la mayoría de las cajas
+# duplicadas ya se descartan antes de NMS por tener score bajo, y entonces
+# variar `iou` apenas se nota.
+res_strict = model(img_url, conf=0.05, iou=0.30, verbose=False)[0]
+res_lax    = model(img_url, conf=0.05, iou=0.80, verbose=False)[0]
 
 fig, axs = plt.subplots(1, 2, figsize=(16, 8))
 axs[0].imshow(res_strict.plot()[:, :, ::-1])
@@ -414,7 +419,7 @@ b) ¿Qué pasaría si pusieras `iou=1.0` en NMS? ¿Y si pusieras `iou=0.0`?
 ---
 ## Sección B: Fine-tuning sobre BCCD
 
-Hasta acá usamos el modelo "tal cual viene": entrenado en COCO, sirve para detectar las 80 clases de COCO. Pero la mayoría de las aplicaciones reales requieren detectar objetos que no están en COCO. En esta sección vamos a tomar el mismo modelo y **fine-tunearlo** sobre el dataset BCCD para que aprenda a detectar tres tipos de células sanguíneas.
+Hasta acá usamos el modelo "tal cual viene": entrenado en COCO, sirve para detectar las 80 clases de COCO. Pero la mayoría de las aplicaciones reales requieren detectar objetos que no están en COCO. En esta sección vamos a tomar el mismo modelo y **realizarle fine-tuning** sobre el dataset BCCD para que aprenda a detectar tres tipos de células sanguíneas.
 ::::
 
 
@@ -571,7 +576,7 @@ results = model.train(
 ::::cell{#ej5-enunciado type=markdown role=enunciado}
 ### Ejercicio 5 — Evaluación y conteo por clase
 
-**Objetivo:** Medir la performance del modelo fine-tuneado y aplicarlo a la tarea concreta de **contar células por clase** comparando con el ground truth.
+**Objetivo:** Medir la performance del modelo después del fine-tuning y aplicarlo a la tarea concreta de **contar células por clase** comparando con el ground truth.
 
 **Enunciado:**
 
@@ -679,7 +684,7 @@ Típicamente, en BCCD la clase con peor mAP es **Platelets** (plaquetas), seguid
 ---
 ## Sección C: Detección zero-shot — qué viene después
 
-Hasta acá hicimos lo que hace la mayoría de los proyectos de detección hoy: tomamos un modelo pre-entrenado y lo fine-tuneamos sobre nuestro dataset etiquetado. Pero hay una línea de modelos más recientes que cambia las reglas del juego: detectores **open-vocabulary** que aceptan las clases como **texto** en tiempo de inferencia, sin necesidad de fine-tuning.
+Hasta acá hicimos lo que hace la mayoría de los proyectos de detección hoy: tomamos un modelo preentrenado y le realizamos fine-tuning sobre nuestro dataset etiquetado. Pero hay una línea de modelos más recientes que cambia las reglas del juego: detectores **open-vocabulary** que aceptan las clases como **texto** en tiempo de inferencia, sin necesidad de fine-tuning.
 ::::
 
 
@@ -699,7 +704,7 @@ El resultado: en inferencia, podés pasarle una lista de clases como prompt — 
 
 **Cuándo NO conviene:**
 
-- **Producción estable** con clases fijas y necesidad de máximo accuracy: un modelo fine-tuneado sobre un dataset razonable suele superar a uno zero-shot.
+- **Producción estable** con clases fijas y necesidad de máximo accuracy: un modelo con fine-tuning sobre un dataset razonable suele superar a uno zero-shot.
 - **Dominios visuales muy distintos** del dato de entrenamiento del modelo zero-shot (microscopía especializada, imágenes médicas específicas, sensores no-RGB): el modelo zero-shot tampoco vio esos dominios durante su pre-entrenamiento, así que no compensa el domain gap.
 
 En este laboratorio probamos **YOLO-World**, que es la integración de open-vocabulary detection dentro del paquete `ultralytics`. Es una variante del backbone YOLO con un encoder de texto adicional y una cabeza de detección que produce embeddings en el mismo espacio que el texto.
@@ -718,8 +723,8 @@ En este laboratorio probamos **YOLO-World**, que es la integración de open-voca
 **Enunciado:**
 
 1. Importá `YOLOWorld` desde `ultralytics` y cargá el modelo `yolov8s-world.pt`.
-2. Definí las clases mediante texto usando `world_model.set_classes([...])`. Probá con clases que **no estén en COCO**, por ejemplo: `["person wearing helmet", "skateboard wheel", "bus window"]`.
-3. Corré inferencia sobre la misma imagen del Ej. 1 (`https://ultralytics.com/images/bus.jpg`) con `conf=0.05` (los modelos open-vocabulary suelen necesitar thresholds más bajos).
+2. Definí las clases mediante texto usando `world_model.set_classes([...])`. Probá con clases que **no estén en COCO**, por ejemplo: `["sunglasses", "shoe", "Bollard", "sign", "hand"]`.
+3. Corré inferencia sobre la misma imagen del Ej. 1 (`https://ultralytics.com/images/bus.jpg`) con `conf=0.05`.
 4. Visualizá el resultado e imprimí las detecciones con clase y confianza.
 
 > **Pista:** La API de `YOLOWorld` es prácticamente idéntica a la de `YOLO`. La única diferencia operativa es la llamada a `set_classes(...)` antes de la inferencia.
@@ -741,9 +746,10 @@ from ultralytics import YOLOWorld
 world_model = YOLOWorld('yolov8s-world.pt')
 
 # ─── Definir las clases mediante texto ─────────────────────────────────────
-# Probemos clases que NO estaban en COCO ni en BCCD: descripciones más
-# específicas que combinan objeto + atributo.
-world_model.set_classes(["person wearing helmet", "skateboard wheel", "bus window"])
+# Probemos clases que NO estaban en COCO ni en BCCD: objetos cotidianos que
+# pueden aparecer en una escena callejera pero no figuran en las 80 clases
+# de COCO.
+world_model.set_classes(["sunglasses", "shoe", "Bollard", "sign", "hand"])
 
 img_url = 'https://ultralytics.com/images/bus.jpg'
 res = world_model(img_url, conf=0.05, verbose=False)[0]
@@ -789,7 +795,7 @@ a) **YOLO sin fine-tuning** (directamente `yolo11n` o `yolo11s` sobre COCO). "Pe
 
 b) **Zero-shot / open-vocabulary** (YOLO-World, Grounding DINO). No hay dataset todavía y el concepto de "anómala" no es trivial de fijar; el investigador puede prototipar con prompts iterativos ("redondas con núcleo grande", "irregulares") sin invertir tiempo en etiquetado. Una vez que entiende qué busca, puede pasar a fine-tuning si necesita más accuracy.
 
-c) **YOLO con fine-tuning** (variante mediana o grande, `yolo11m`/`yolo11l`). Tienen 3000 imágenes etiquetadas — datos suficientes —, las clases son fijas y estables, y la prioridad es **máximo accuracy**. Un modelo fine-tuneado sobre datos del dominio supera a cualquier zero-shot. Ventaja adicional: YOLO se exporta fácil a ONNX/TensorRT para integrarlo en la línea con baja latencia.
+c) **YOLO con fine-tuning** (variante mediana o grande, `yolo11m`/`yolo11l`). Tienen 3000 imágenes etiquetadas — datos suficientes —, las clases son fijas y estables, y la prioridad es **máximo accuracy**. Un modelo con fine-tuning sobre datos del dominio supera a cualquier zero-shot. Ventaja adicional: YOLO se exporta fácil a ONNX/TensorRT para integrarlo en la línea con baja latencia.
 
 d) **Zero-shot.** Es exactamente el escenario para el que están pensados estos modelos: no hay tiempo de etiquetar, las clases son fáciles de describir en texto ("bottle of soda", "cereal box", "bag of chips"), y el resultado no necesita ser perfecto sino convincente para la demo. Si el cliente aprueba, después se hace fine-tuning con datos reales.
 
