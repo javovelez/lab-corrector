@@ -52,16 +52,15 @@ Términos que vamos a usar repetidamente:
 
 ### Panorama de detectores en 2026
 
-En el campo conviven cuatro familias principales. Es importante saber qué hay porque la elección depende del problema:
+En el campo conviven tres familias principales. Es importante saber qué hay porque la elección depende del problema:
 
 | Familia | Ejemplos | Fortaleza | Cuándo conviene |
 |---|---|---|---|
 | **YOLO** (one-stage) | YOLOv8, YOLOv11 (Ultralytics) | Velocidad, fine-tuning trivial, ecosistema maduro | Tiempo real, edge devices, proyectos donde "que ande rápido" importa más que el último 1% de mAP |
 | **Transformer-based** | DETR, RT-DETR, DINO | Sin anchors, sin NMS, formulación más limpia | Cuando la flexibilidad del transformer aporta (relaciones entre objetos, escenas complejas) |
 | **Two-stage clásicos** | Faster R-CNN, Mask R-CNN (torchvision) | Estabilidad, transparencia pedagógica | Pipelines legacy, segmentación de instancias |
-| **Open-vocabulary / zero-shot** | Grounding DINO, **YOLO-World**, OWL-ViT | Detectar clases descritas en texto sin entrenar | Prototipado, datasets sin etiquetar, clases que cambian |
 
-**En este laboratorio usamos YOLO (Ultralytics) como herramienta principal** — es el estándar de facto para detección práctica hoy — y al final tocamos zero-shot con YOLO-World para ver hacia dónde va el campo.
+**En este laboratorio usamos YOLO (Ultralytics) como herramienta principal** — es el estándar de facto para detección práctica hoy. Las otras familias quedan mencionadas como contexto: cuándo conviene mirar más allá de YOLO es una decisión que se toma según el problema concreto.
 
 > **Nota sobre licencia:** la implementación de Ultralytics está bajo **AGPL-3.0**. Para uso educativo y prototipado no hay problema. Si más adelante usás YOLO en un producto comercial cerrado, vas a tener que evaluar licenciamiento (Ultralytics ofrece licencia comercial paga, o existen forks bajo licencias permisivas).
 
@@ -307,7 +306,7 @@ Mirá las clases que detectó el modelo. ¿Por qué no detecta "ventana", "rueda
 
 El modelo está entrenado sobre **COCO**, que tiene exactamente 80 clases predefinidas (persona, auto, bus, bicicleta, semáforo, etc.). El modelo solo puede predecir clases que vio durante el entrenamiento: el conjunto de salidas posibles está fijado por la arquitectura de la cabeza de clasificación, que tiene 80 neuronas — una por clase.
 
-Una "ventana", una "rueda" o un "espejo" no están en ese vocabulario, así que aunque visualmente estén ahí, el modelo no las "ve" como categoría: no tiene una salida posible que las represente. Esta limitación es una propiedad fundamental de los detectores supervisados de vocabulario cerrado, y es justamente lo que motivan los modelos de vocabulario abierto (zero-shot) que vamos a ver al final del laboratorio.
+Una "ventana", una "rueda" o un "espejo" no están en ese vocabulario, así que aunque visualmente estén ahí, el modelo no las "ve" como categoría: no tiene una salida posible que las represente. Esta limitación es una propiedad fundamental de los detectores supervisados de vocabulario cerrado: si necesitamos detectar clases nuevas, hay que entrenar (o realizar fine-tuning) sobre datos que las contengan — exactamente lo que vamos a hacer en la próxima sección con BCCD.
 ```
 ::::
 
@@ -680,134 +679,6 @@ Típicamente, en BCCD la clase con peor mAP es **Platelets** (plaquetas), seguid
 ::::
 
 
-::::cell{#secC type=markdown role=section}
----
-## Sección C: Detección zero-shot — qué viene después
-
-Hasta acá hicimos lo que hace la mayoría de los proyectos de detección hoy: tomamos un modelo preentrenado y le realizamos fine-tuning sobre nuestro dataset etiquetado. Pero hay una línea de modelos más recientes que cambia las reglas del juego: detectores **open-vocabulary** que aceptan las clases como **texto** en tiempo de inferencia, sin necesidad de fine-tuning.
-::::
-
-
-::::cell{#secC-zeroshot type=markdown role=scaffolding}
-### Detección open-vocabulary
-
-Modelos como **Grounding DINO**, **OWL-ViT** y **YOLO-World** combinan un backbone visual con un encoder de texto (estilo CLIP). Durante el entrenamiento se les muestran muchísimos pares imagen + descripciones textuales, y aprenden a alinear regiones de la imagen con descripciones en lenguaje natural.
-
-El resultado: en inferencia, podés pasarle una lista de clases como prompt — `["dog", "person wearing red shirt", "blue car"]` — y el modelo detecta esas clases sin haberlas visto explícitamente etiquetadas durante el entrenamiento.
-
-**Cuándo conviene zero-shot:**
-
-- **Prototipado rápido:** querés una demo en un día, sin tiempo de etiquetar nada.
-- **Clases que cambian:** un cliente que hoy quiere detectar "botellas" y mañana quiere "frascos de mermelada"; con un modelo zero-shot basta con cambiar el prompt.
-- **Clases raras:** la clase de interés tiene tan pocos ejemplos en el mundo que reunir un dataset etiquetado es prohibitivo.
-- **Búsqueda visual abierta:** "encontrar todas las imágenes que tengan X" sobre un corpus, donde X es definido por el usuario.
-
-**Cuándo NO conviene:**
-
-- **Producción estable** con clases fijas y necesidad de máximo accuracy: un modelo con fine-tuning sobre un dataset razonable suele superar a uno zero-shot.
-- **Dominios visuales muy distintos** del dato de entrenamiento del modelo zero-shot (microscopía especializada, imágenes médicas específicas, sensores no-RGB): el modelo zero-shot tampoco vio esos dominios durante su pre-entrenamiento, así que no compensa el domain gap.
-
-En este laboratorio probamos **YOLO-World**, que es la integración de open-vocabulary detection dentro del paquete `ultralytics`. Es una variante del backbone YOLO con un encoder de texto adicional y una cabeza de detección que produce embeddings en el mismo espacio que el texto.
-::::
-
-
-<!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 6 — YOLO-World + pregunta de análisis final
-     ────────────────────────────────────────────────────────────────────── -->
-
-::::cell{#ej6-enunciado type=markdown role=enunciado}
-### Ejercicio 6 — Detección zero-shot con YOLO-World
-
-**Objetivo:** Ver de primera mano cómo funciona la detección open-vocabulary y comparar el resultado con un modelo de vocabulario cerrado.
-
-**Enunciado:**
-
-1. Importá `YOLOWorld` desde `ultralytics` y cargá el modelo `yolov8s-world.pt`.
-2. Definí las clases mediante texto usando `world_model.set_classes([...])`. Probá con clases que **no estén en COCO**, por ejemplo: `["sunglasses", "shoe", "Bollard", "sign", "hand"]`.
-3. Corré inferencia sobre la misma imagen del Ej. 1 (`https://ultralytics.com/images/bus.jpg`) con `conf=0.05`.
-4. Visualizá el resultado e imprimí las detecciones con clase y confianza.
-
-> **Pista:** La API de `YOLOWorld` es prácticamente idéntica a la de `YOLO`. La única diferencia operativa es la llamada a `set_classes(...)` antes de la inferencia.
-::::
-
-
-::::cell{#ej6-code type=code role=student-code}
-```python
-# Tu código aquí
-```
-
-```python solution
-# ─── Cargar YOLO-World ──────────────────────────────────────────────────────
-# YOLO-World es un detector "open-vocabulary": en vez de tener un conjunto
-# fijo de clases, acepta una lista de nombres de clase como prompt de texto
-# y detecta esos objetos sin fine-tuning específico.
-from ultralytics import YOLOWorld
-
-world_model = YOLOWorld('yolov8s-world.pt')
-
-# ─── Definir las clases mediante texto ─────────────────────────────────────
-# Probemos clases que NO estaban en COCO ni en BCCD: objetos cotidianos que
-# pueden aparecer en una escena callejera pero no figuran en las 80 clases
-# de COCO.
-world_model.set_classes(["sunglasses", "shoe", "Bollard", "sign", "hand"])
-
-img_url = 'https://ultralytics.com/images/bus.jpg'
-res = world_model(img_url, conf=0.05, verbose=False)[0]
-
-plt.figure(figsize=(10, 8))
-plt.imshow(res.plot()[:, :, ::-1])
-plt.axis('off')
-plt.title('YOLO-World con prompt de texto')
-plt.show()
-
-print(f"Detecciones: {len(res.boxes)}")
-for box in res.boxes:
-    cls_id   = int(box.cls[0])
-    cls_name = res.names[cls_id]
-    conf     = float(box.conf[0])
-    print(f"  {cls_name:25s}  conf={conf:.2f}")
-```
-::::
-
-
-::::cell{#ej6-pregunta type=markdown role=pregunta}
-**Pregunta de análisis (final):**
-
-Para cada uno de los siguientes escenarios, indicá qué familia de detector usarías (YOLO con fine-tuning, YOLO sin fine-tuning, transformer-based, zero-shot/open-vocabulary) y justificá brevemente.
-
-a) Una **app móvil** que detecta personas y autos en tiempo real para asistencia a la conducción.
-
-b) Un **investigador biólogo** que quiere encontrar "células anómalas" en sus imágenes de microscopía pero todavía no tiene un dataset etiquetado.
-
-c) Una **línea de fabricación** que necesita detectar 5 tipos específicos de defectos en piezas. Tienen 3000 imágenes etiquetadas y exigen máximo accuracy.
-
-d) Un **prototipo rápido** para mostrarle a un cliente un demo de "detección de productos en góndola", sin tiempo para etiquetar.
-::::
-
-
-::::cell{#ej6-respuesta type=markdown role=student-answer}
-*(Escribí tu respuesta acá)*
-
-```markdown solution
-**Respuesta a la pregunta de análisis (final):**
-
-a) **YOLO sin fine-tuning** (directamente `yolo11n` o `yolo11s` sobre COCO). "Persona" y "auto" están en COCO, así que no hace falta entrenar nada. Lo crítico es **latencia baja** en hardware modesto (móvil); YOLO en variante nano corre en tiempo real incluso en CPU.
-
-b) **Zero-shot / open-vocabulary** (YOLO-World, Grounding DINO). No hay dataset todavía y el concepto de "anómala" no es trivial de fijar; el investigador puede prototipar con prompts iterativos ("redondas con núcleo grande", "irregulares") sin invertir tiempo en etiquetado. Una vez que entiende qué busca, puede pasar a fine-tuning si necesita más accuracy.
-
-c) **YOLO con fine-tuning** (variante mediana o grande, `yolo11m`/`yolo11l`). Tienen 3000 imágenes etiquetadas — datos suficientes —, las clases son fijas y estables, y la prioridad es **máximo accuracy**. Un modelo con fine-tuning sobre datos del dominio supera a cualquier zero-shot. Ventaja adicional: YOLO se exporta fácil a ONNX/TensorRT para integrarlo en la línea con baja latencia.
-
-d) **Zero-shot.** Es exactamente el escenario para el que están pensados estos modelos: no hay tiempo de etiquetar, las clases son fáciles de describir en texto ("bottle of soda", "cereal box", "bag of chips"), y el resultado no necesita ser perfecto sino convincente para la demo. Si el cliente aprueba, después se hace fine-tuning con datos reales.
-
-**Patrón general:**
-- ¿Tenés datos etiquetados y clases fijas? → fine-tuning.
-- ¿No tenés datos pero las clases son cotidianas y están en COCO? → modelo preentrenado tal cual.
-- ¿No tenés datos y las clases son específicas / abiertas? → zero-shot.
-- ¿La latencia es crítica? → YOLO (sobre las otras opciones).
-```
-::::
-
-
 ::::cell{#checklist type=markdown role=checklist}
 ---
 ## Antes de entregar
@@ -818,7 +689,7 @@ Revisá esta checklist rápida:
 - [ ] El fine-tuning corrió completo y el checkpoint quedó guardado en `runs/detect/bccd_finetune/weights/best.pt`.
 - [ ] Los `mAP50` por clase tienen valores razonables (no todos en 0.0 ni en 1.0).
 - [ ] Las visualizaciones muestran las cajas predichas con sus clases y confianzas.
-- [ ] Respondí las cuatro preguntas de análisis (Ej. 1, 2, 3, 5, 6).
+- [ ] Respondí las cuatro preguntas de análisis (Ej. 1, 2, 3, 5).
 - [ ] No modifiqué ninguna celda fuera de las de actividad.
 ::::
 
@@ -832,7 +703,6 @@ Completaste tu primer laboratorio de detección de objetos. Practicaste:
 - **Inferencia con un detector preentrenado** (YOLOv11 sobre COCO) y los efectos de los thresholds de confianza y NMS.
 - **Fine-tuning** sobre un dataset clínico chico (BCCD), con la lógica de transfer learning aplicada a detección.
 - **Evaluación** con mAP por clase y aplicación a una tarea concreta (conteo de células).
-- **Detección zero-shot** con YOLO-World, viendo cuándo conviene cada familia de detector.
 
 El próximo laboratorio (4b) extiende lo que vimos acá a **segmentación de imágenes**: en lugar de predecir solo una caja alrededor de cada objeto, vamos a predecir el contorno exacto píxel por píxel.
 ::::
