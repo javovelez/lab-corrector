@@ -53,6 +53,59 @@ def _clean_path(raw: str) -> str:
         s = s[1:-1].strip()
     return s
 
+
+def _osascript_choose(kind: str, initial: str | None = None) -> str | None:
+    """Abre el Finder vía osascript. `kind` = 'folder' | 'file'.
+
+    Devuelve POSIX path elegido o None si se canceló.
+    """
+    base = "POSIX path of (choose folder" if kind == "folder" else "POSIX path of (choose file"
+    if initial:
+        safe = initial.replace('"', '\\"')
+        base += f' default location POSIX file "{safe}"'
+    script = base + ")"
+    try:
+        r = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True, text=True, timeout=300,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    out = r.stdout.strip()
+    if out and out != "/":
+        out = out.rstrip("/")
+    return out or None
+
+
+def _initial_dir(current: str, kind: str) -> str | None:
+    """Carpeta donde abrir el diálogo según el path actual."""
+    if not current:
+        return None
+    p = Path(current).expanduser()
+    if kind == "folder" and p.is_dir():
+        return str(p)
+    if p.parent.is_dir():
+        return str(p.parent)
+    return None
+
+
+def _choose_path_button(label: str, key: str, kind: str) -> str:
+    """Botón que abre el diálogo nativo + caption con el path elegido.
+
+    Guarda el path en `st.session_state[key]` y lo devuelve.
+    """
+    if st.button(label, key=f"{key}-pick", use_container_width=True):
+        cur = st.session_state.get(key, "")
+        chosen = _osascript_choose(kind, _initial_dir(cur, kind))
+        if chosen:
+            st.session_state[key] = chosen
+            st.rerun()
+    cur = st.session_state.get(key, "")
+    st.caption(f"`{cur}`" if cur else "_(sin elegir)_")
+    return cur
+
 import recents
 from ai import (
     GroupEntrega,
@@ -263,53 +316,46 @@ def landing() -> None:
                 st.rerun()
 
     st.markdown("### Abrir otra carpeta")
-    path_str = st.text_input(
-        "Path absoluto al workdir",
-        key="landing-open-path",
-        placeholder="/Users/javiervelez/Downloads/RNP_Lab3_abril",
-    )
-    if st.button("Abrir", key="landing-open-btn"):
-        clean = _clean_path(path_str)
-        p = Path(clean).expanduser() if clean else None
-        if p is None or not p.is_dir():
-            st.error("Esa carpeta no existe.")
-        else:
-            _enter_workdir(p)
+    if st.button("Elegir carpeta del workdir…", key="landing-open-pick", use_container_width=True):
+        chosen = _osascript_choose("folder")
+        if chosen:
+            p = Path(chosen).expanduser()
+            if p.is_dir():
+                _enter_workdir(p)
+            else:
+                st.error("Esa carpeta no existe.")
 
     st.markdown("### Nueva corrección")
-    with st.form("new-workdir"):
-        wd_str = st.text_input(
-            "Carpeta (workdir) — donde tenés o vas a poner el zip de Moodle",
-            placeholder="/Users/javiervelez/Downloads/RNP_Lab3_abril",
-        )
-        title = st.text_input("Título del lab", placeholder="Laboratorio 3 — Transferencia")
-        nb_enun = st.text_input("Notebook de enunciado (.ipynb)", placeholder="/ruta/al/Laboratorio_X.ipynb")
-        nb_sol  = st.text_input("Notebook de solución (.ipynb)",  placeholder="/ruta/al/Laboratorio_X_Solucion.ipynb")
-        zip_path = st.text_input(
-            "Zip de Moodle (opcional — podés importarlo después)",
-            placeholder="/Users/javiervelez/Downloads/entregas_lab3.zip",
-        )
-        rubric_mode = st.radio(
-            "Rúbrica",
-            ["Generar automáticamente desde la solución (usa Claude)", "Ya tengo una (.rubric.yaml)"],
-            index=0,
-        )
-        rubric_existing = st.text_input(
-            "Path al .rubric.yaml existente (solo si elegiste la segunda opción)",
-            placeholder="/ruta/a/rubrica.yaml",
-        )
+    st.markdown("**Carpeta del workdir**")
+    wd_str = _choose_path_button("Elegir carpeta…", "new-wd", "folder")
+    title = st.text_input("Título del lab", key="new-title", placeholder="Laboratorio 3 — Transferencia")
+    st.markdown("**Notebook de enunciado (.ipynb)**")
+    nb_enun = _choose_path_button("Elegir notebook de enunciado…", "new-nb-enun", "file")
+    st.markdown("**Notebook de solución (.ipynb)**")
+    nb_sol = _choose_path_button("Elegir notebook de solución…", "new-nb-sol", "file")
+    st.markdown("**Zip de Moodle** (opcional — podés importarlo después)")
+    zip_path = _choose_path_button("Elegir zip…", "new-zip", "file")
+    rubric_mode = st.radio(
+        "Rúbrica",
+        ["Generar automáticamente desde la solución (usa Claude)", "Ya tengo una (.rubric.yaml)"],
+        index=0,
+        key="new-rubric-mode",
+    )
+    rubric_existing = ""
+    if rubric_mode.startswith("Ya tengo"):
+        st.markdown("**Rúbrica existente (.rubric.yaml)**")
+        rubric_existing = _choose_path_button("Elegir rúbrica…", "new-rubric-path", "file")
 
-        submitted = st.form_submit_button("Crear", type="primary", use_container_width=True)
-        if submitted:
-            _create_new_workdir(
-                wd_str=wd_str,
-                title=title,
-                nb_enun_str=nb_enun,
-                nb_sol_str=nb_sol,
-                zip_str=zip_path,
-                auto_rubric=(rubric_mode.startswith("Generar")),
-                rubric_existing_str=rubric_existing,
-            )
+    if st.button("Crear", type="primary", use_container_width=True, key="new-create-btn"):
+        _create_new_workdir(
+            wd_str=wd_str,
+            title=title,
+            nb_enun_str=nb_enun,
+            nb_sol_str=nb_sol,
+            zip_str=zip_path,
+            auto_rubric=(rubric_mode.startswith("Generar")),
+            rubric_existing_str=rubric_existing,
+        )
 
 
 def _enter_workdir(wd: Path) -> None:
@@ -424,17 +470,13 @@ def sidebar(wd: Path, cfg: WorkdirConfig) -> None:
             "se copian a `<workdir>/grupo_NN/entrega.ipynb`. El feedback "
             "existente de cada grupo se preserva."
         )
-        zip_str = st.text_input(
-            "Ruta al zip de Moodle",
-            value=st.session_state.get("intake-zip", ""),
-            placeholder="/Users/javiervelez/Downloads/entregas_lab3.zip",
-            key="intake-zip-input",
-        )
+        st.markdown("**Zip de Moodle**")
+        zip_str = _choose_path_button("Elegir zip…", "intake-zip", "file")
         if st.button("Importar", use_container_width=True, key="btn-intake"):
             clean = _clean_path(zip_str)
             zp = Path(clean).expanduser() if clean else None
             if zp is None:
-                st.error("Indicá la ruta al zip.")
+                st.error("Elegí primero el zip.")
             else:
                 with st.spinner("Importando…"):
                     report = intake_zip(zp, wd)
@@ -443,7 +485,6 @@ def sidebar(wd: Path, cfg: WorkdirConfig) -> None:
                     "skipped":  report.skipped,
                     "warnings": report.warnings,
                 }
-                st.session_state["intake-zip"] = zip_str
                 st.rerun()
 
         rep = st.session_state.get("intake-last-report")
@@ -1451,11 +1492,13 @@ def view_correccion(
 # ─── Dispatch ────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    # Auto-seleccionar el workdir más reciente si no hay uno en la sesión.
-    if "workdir" not in st.session_state:
+    # Auto-seleccionar el workdir más reciente solo en el primer dispatch
+    # de la sesión. Después, "Cambiar workdir" debe llevar al landing.
+    if "workdir" not in st.session_state and not st.session_state.get("_auto_select_done"):
         rec = recents.list_recents()
         if rec:
             st.session_state["workdir"] = str(rec[0])
+    st.session_state["_auto_select_done"] = True
 
     wd_str = st.session_state.get("workdir")
     if not wd_str:

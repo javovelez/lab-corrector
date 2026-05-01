@@ -49,9 +49,9 @@ La forma de "U" del diagrama (de ahí el nombre) refleja exactamente eso: bajar,
 
 ### El dataset: Oxford-IIIT Pet
 
-Vamos a usar **Oxford-IIIT Pet** (Parkhi et al. 2012), un dataset clásico de imágenes de mascotas. Cada imagen tiene asociada una máscara de segmentación **trimap** con tres valores: `1` para los píxeles de la mascota, `2` para el fondo y `3` para los píxeles de borde (esos los vamos a tratar como "ignorar" durante el entrenamiento, igual que el borde blanco de VOC). Para nuestro lab queda como un problema de segmentación **binaria**: clase 0 = fondo, clase 1 = mascota.
+Vamos a usar **Oxford-IIIT Pet** (Parkhi et al. 2012), un dataset clásico de imágenes de mascotas. Cada imagen tiene asociada una máscara de segmentación **trimap** con tres valores: `1` para los píxeles de la mascota, `2` para el fondo y `3` para los píxeles de borde (esos los vamos a tratar como "ignorar" durante el entrenamiento porque el anotador no estaba seguro de a qué clase pertenecen). Para nuestro lab queda como un problema de segmentación **binaria**: clase 0 = fondo, clase 1 = mascota.
 
-> **Por qué Pet y no Pascal VOC:** VOC2012 (21 clases, ~1.5k imágenes de train) es un problema demasiado difícil para una U-Net entrenada **desde cero** sin pesos preentrenados ni augmentation pesada — el paper original de U-Net se entrenaba sobre datasets biomédicos con deformaciones elásticas como augmentation. Pet (2 clases efectivas, ~3.7k imágenes de trainval) es mucho más manejable: las imágenes están centradas en el sujeto, hay poca ambigüedad de clase y la red aprende a segmentar reconocido en ~15-20 minutos de Colab T4.
+Pet es cómodo para un primer contacto con segmentación: tiene ~3.7k imágenes de trainval, las fotos están centradas en el sujeto, la ambigüedad de clase es baja y el dataset es lo suficientemente chico como para entrenar en una sesión de Colab. Eso permite enfocarnos en la arquitectura y el ciclo de entrenamiento sin que el cuello de botella sea la complejidad del dataset.
 
 ### Lo que vas a hacer
 
@@ -76,7 +76,7 @@ El laboratorio se divide en seis bloques:
 - Respondé las preguntas de análisis en las celdas de texto (tipo Markdown).
 - Para el material teórico (convolución transpuesta, FCN, segmentación semántica) consultá el notebook `Segmentacion.ipynb` de la clase.
 - Las celdas de test al final de cada bloque te ayudan a verificar que tu implementación devuelve tensores con la forma correcta. **No las modifiques**: si fallan, el problema está en tu código.
-- Los entrenamientos del Ej. 9 (prueba inicial desde cero) y del Ej. 11 (fine-tuning) toman **5-8 minutos cada uno** sobre Colab T4. Podés ir avanzando con otra cosa mientras corren.
+- Los entrenamientos del Ej. 8 (prueba inicial desde cero) y del Ej. 10 (fine-tuning) toman **5-8 minutos cada uno** sobre Colab T4. Podés ir avanzando con otra cosa mientras corren.
 ::::
 
 
@@ -182,7 +182,7 @@ print(f"Clases ({NUM_CLASSES}): {PET_CLASSES}")
 
 
 # ─── Helper para visualización: leyenda con colores de las clases ──────────
-# Se usa en el Ej. 10. Pega una fila de cuadritos coloreados arriba de la
+# Se usa en el Ej. 9. Pega una fila de cuadritos coloreados arriba de la
 # figura asociando cada color de PET_COLORMAP a su nombre de clase, más un
 # cuadrito gris para los píxeles `ignore`.
 from matplotlib.patches import Patch
@@ -218,7 +218,7 @@ def add_seg_legend(fig, class_names=PET_CLASSES, colormap=PET_COLORMAP):
 #      dataset sin costo.
 #   5. Normaliza la imagen con la media/std de ImageNet.
 #   6. Mapea el trimap {1=pet, 2=bg, 3=border} a {1, 0, 255} para que la
-#      cross-entropy del Ej. 9 ignore los píxeles de borde con ignore_index.
+#      cross-entropy del Ej. 8 ignore los píxeles de borde con ignore_index.
 #
 # El parámetro `subset_size` permite tomar solo una porción del dataset.
 # Lo usamos para que el train no demore más de ~20 minutos.
@@ -312,42 +312,29 @@ La solución estándar — la que usa nuestro `PetSegDataset` — es **recortar 
 ::::
 
 
-<!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 1 — Visualización del dataset
-     ────────────────────────────────────────────────────────────────────── -->
+::::cell{#secA-trimaps type=markdown role=scaffolding}
+### Una mirada rápida al trimap
 
-::::cell{#ej1-enunciado type=markdown role=enunciado}
-### Ejercicio 1 — Inspeccionar imágenes y trimaps
+Antes de pasar a los `DataLoader` conviene mirar a ojo qué forma tienen las imágenes y qué información codifica el trimap. La función `read_pet_images` que aparece debajo lee unas pocas imágenes y sus máscaras directamente del disco — sin pasar por `PetSegDataset` — usando la lista de nombres de archivo del split correspondiente (`annotations/trainval.txt` o `annotations/test.txt`, donde cada línea tiene la forma `<nombre> <class_id> <species> <breed_id>` y solo nos interesa el primer campo). La definimos acá porque más adelante (Ej. 8 y Ej. 9) la vamos a reusar para tomar imágenes del split de test y compararlas con las predicciones del modelo.
 
-**Objetivo:** Cargar imágenes y trimaps directamente desde el disco (sin pasar por el `Dataset`) para entender qué forma tienen y qué información codifica cada cosa.
+Para leer los archivos usamos `torchvision.io.read_image`, que devuelve directamente un tensor `uint8`. Los trimaps **no** requieren conversión a RGB: vienen como paleta indexada de un solo canal con valores `{1, 2, 3}`, así que la lectura por default ya entrega exactamente lo que necesitamos. Para visualizarlos pasamos a `imshow` un colormap discreto (`cmap='viridis'`) — si los mostráramos con un colormap continuo, los tres valores se verían casi negros.
 
-**Enunciado:**
+La grilla resultante muestra, en su fila superior, las primeras 4 imágenes de `trainval`, y en la fila inferior los trimaps correspondientes. Hay dos cosas para fijarse:
 
-1. Definí una función `read_pet_images` que reciba el directorio del dataset, una cantidad `n` y el nombre del split (`'trainval'` o `'test'`), y devuelva dos listas paralelas con las primeras `n` imágenes y sus respectivos trimaps como tensores. Los listados de nombres de archivo de cada split están en `annotations/trainval.txt` y `annotations/test.txt`. Cada línea de esos archivos tiene la forma `<nombre> <class_id> <species> <breed_id>` — solo nos interesa el primer campo. Las imágenes están en `images/` (extensión `.jpg`) y los trimaps en `annotations/trimaps/` (extensión `.png`).
-2. Llamala con `n=4` sobre el split de trainval.
-3. Visualizá las 4 imágenes y sus 4 trimaps en una grilla de 2×4 — fila superior con las imágenes, fila inferior con los trimaps. Acordate de que matplotlib espera tensores con orden `(H, W, C)` mientras que los tensores de PyTorch vienen como `(C, H, W)`: hay que reordenar los ejes antes de mostrar.
-
-> **Pista 1:** En `torchvision.io` hay una función para leer imágenes que devuelve directamente un tensor `uint8`. Para los trimaps **no** hace falta forzar RGB: vienen como paleta indexada de un solo canal con valores `{1, 2, 3}`, así que la lectura por default ya entrega lo que querés.
->
-> **Pista 2:** Los trimaps tienen muy pocos valores únicos (`1`=mascota, `2`=fondo, `3`=borde). Si los mostrás directamente con un colormap continuo van a verse casi negros. Pasale a `imshow` un colormap discreto (por ejemplo `cmap='viridis'` o `cmap='tab10'`) para que los tres valores se distingan.
+- **Los trimaps tienen tres valores únicos**: `1` para los píxeles de la mascota, `2` para el fondo y `3` para los bordes "no estoy seguro" del anotador (que después tratamos como `IGNORE_INDEX`).
+- **El fondo domina la imagen** aunque la cámara esté apuntando claramente al animal. Una mascota típica ocupa el 25-35% del cuadro; el resto es piso, pasto, sofá, pared. Sumado sobre el dataset, el fondo se lleva ~70% de los píxeles y la mascota ~30%. Es un desbalance suave pero claro y vamos a tener que tenerlo en cuenta cuando entrenemos en la **Sección D** (ahí calculamos pesos por clase para que la red no colapse a "predecir todo fondo").
 ::::
 
 
-::::cell{#ej1-code type=code role=student-code}
+::::cell{#secA-trimaps-code type=code role=setup}
 ```python
-# Tu código aquí
-```
-
-```python solution
-# ─── Función para leer imágenes + trimaps de un split ──────────────────────
+# ─── read_pet_images: lectura directa desde el disco ────────────────────────
+# Lee las primeras `n` imágenes y trimaps del split indicado, sin pasar por
+# PetSegDataset. La reusamos en los Ej. 8 y 9 para comparar predicciones con
+# el ground truth.
 def read_pet_images(pet_dir, n, split='trainval'):
     """
     Lee las primeras n imágenes y trimaps del split indicado.
-
-    Parámetros:
-    pet_dir (str): ruta a la carpeta del dataset Pet.
-    n (int): cantidad de imágenes a leer.
-    split (str): 'trainval' o 'test'.
 
     Retorna:
     features (list[Tensor]): imágenes RGB uint8 (3, H, W).
@@ -369,7 +356,9 @@ def read_pet_images(pet_dir, n, split='trainval'):
     return features, labels
 
 
-# ─── Visualización ──────────────────────────────────────────────────────────
+# ─── Visualización: 4 imágenes y sus trimaps ───────────────────────────────
+# matplotlib espera (H, W, C); los tensores de PyTorch vienen como (C, H, W),
+# así que reordenamos con permute(1, 2, 0) antes de mostrar las imágenes.
 n = 4
 imgs, masks = read_pet_images(pet_dir, n, split='trainval')
 
@@ -389,34 +378,12 @@ plt.show()
 ::::
 
 
-::::cell{#ej1-pregunta type=markdown role=pregunta}
-**Pregunta de análisis:**
-
-Mirando los trimaps: ¿por qué creés que en la mayoría de las imágenes la clase **fondo** ocupa más píxeles que la mascota, aún cuando la cámara está claramente apuntando al animal? ¿Qué problema podría traer ese desbalance al entrenar una red de segmentación con la cross-entropy "estándar" (sin pesos por clase)?
-::::
-
-
-::::cell{#ej1-respuesta type=markdown role=student-answer}
-*(Escribí tu respuesta acá)*
-
-```markdown solution
-**Respuesta a la pregunta de análisis:**
-
-Aunque las fotos de Pet están centradas en la mascota y rara vez la mascota es chica en relación con el cuadro, igual el **fondo** suele cubrir más píxeles. Un perro o gato típicos tienen una silueta que ocupa quizá un 25-35% del área de la imagen; el otro 65-75% es piso, pasto, sofá, mesa, pared, lo que sea. Si sumás los píxeles a lo largo de todo el dataset, fondo se lleva alrededor del 70% y la mascota el 30%. Hay desbalance, suave pero claro.
-
-El problema con cross-entropy "plana" (las dos clases con el mismo peso) es que la pérdida se domina por la clase mayoritaria. Una red que se limite a predecir "fondo" en cada píxel ya acierta ~70% de los píxeles y obtiene una pérdida baja, sin haber aprendido nada útil sobre la silueta del animal. Como el gradiente sigue mayormente la dirección que reduce la pérdida del fondo, la red se queda en ese mínimo "perezoso" y nunca aprende a discriminar al sujeto.
-
-La solución estándar es **ponderar la pérdida** dándole más peso a los píxeles de la clase minoritaria (mascota), o equivalentemente menos peso al fondo. Eso es exactamente lo que vamos a hacer en la Sección D. En problemas multiclase con muchas clases minoritarias el efecto es aún más fuerte que en este caso binario.
-```
-::::
-
-
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 2 — Construir DataLoaders
+     EJERCICIO 1 — Construir DataLoaders
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej2-enunciado type=markdown role=enunciado}
-### Ejercicio 2 — Instanciar `PetSegDataset` y armar los `DataLoader`
+::::cell{#ej1-enunciado type=markdown role=enunciado}
+### Ejercicio 1 — Instanciar `PetSegDataset` y armar los `DataLoader`
 
 **Objetivo:** Usar la clase `PetSegDataset` (preescrita) para crear los datasets de train y val, envolverlos en `DataLoader` e inspeccionar la forma de un batch.
 
@@ -426,7 +393,7 @@ La solución estándar es **ponderar la pérdida** dándole más peso a los píx
 2. Creá dos datasets:
    - **train:** instanciá `PetSegDataset` sobre el split `'trainval'` con un `subset_size` de 1500 imágenes y data augmentation activada. El subset es por una razón puramente práctica: Pet tiene ~3700 imágenes en trainval y entrenar con todas tomaría más de media hora; con 1500 alcanzamos `val_acc` razonable en ~20 minutos.
    - **val:** instanciá `PetSegDataset` sobre el split `'test'` con todo el dataset (sin subset) y la augmentation desactivada — en validación no queremos que cada época vea una versión distinta de la misma imagen.
-3. Envolvé cada dataset en un `DataLoader` con tamaño de batch 8, descartando el último batch si queda incompleto y con un par de workers para paralelizar la lectura del disco. Acordate de que el train se baraja entre épocas y val no.
+3. Envolvé cada dataset en un `DataLoader` (`torch.utils.data.DataLoader`) con tamaño de batch 8, descartando el último batch si queda incompleto y con un par de workers para paralelizar la lectura del disco. Acordate de que el train se baraja entre épocas y val no.
 4. Pedile al iterador de train su primer batch e imprimí la forma de las imágenes y las máscaras, junto con el rango de valores de las máscaras (mínimo y máximo). Las imágenes deberían tener forma `(8, 3, 256, 256)` con valores normalizados (no en [0, 1]); las máscaras `(8, 256, 256)` con valores en `{0, 1, 255}` (fondo, mascota, ignorar).
 
 > **Pista:** Descartar el último batch incompleto se logra con un argumento del `DataLoader` cuyo nombre habla por sí solo. En segmentación no es crítico, pero es la convención.
@@ -435,7 +402,7 @@ La solución estándar es **ponderar la pérdida** dándole más peso a los píx
 ::::
 
 
-::::cell{#ej2-code type=code role=student-code}
+::::cell{#ej1-code type=code role=student-code}
 ```python
 # Tu código aquí
 ```
@@ -472,14 +439,14 @@ print(f"Valores únicos en Y (primer batch): "
 ::::
 
 
-::::cell{#ej2-pregunta type=markdown role=pregunta}
+::::cell{#ej1-pregunta type=markdown role=pregunta}
 **Pregunta de análisis:**
 
 El batch de imágenes tiene shape `(8, 3, 256, 256)` y el batch de máscaras tiene shape `(8, 256, 256)` — sin la dimensión de canales. ¿Por qué la máscara no tiene canales? ¿Qué está representando cada valor del tensor `Y`, y qué significa específicamente el valor `255`?
 ::::
 
 
-::::cell{#ej2-respuesta type=markdown role=student-answer}
+::::cell{#ej1-respuesta type=markdown role=student-answer}
 *(Escribí tu respuesta acá)*
 
 ```markdown solution
@@ -511,11 +478,11 @@ Las piezas son cinco:
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 3 — SimpleConvolution
+     EJERCICIO 2 — SimpleConvolution
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej3-enunciado type=markdown role=enunciado}
-### Ejercicio 3 — `SimpleConvolution`: bloque de doble convolución
+::::cell{#ej2-enunciado type=markdown role=enunciado}
+### Ejercicio 2 — `SimpleConvolution`: bloque de doble convolución
 
 **Objetivo:** Implementar el bloque que aparece en cada nivel de la U-Net: dos convoluciones 3×3 con ReLU intercaladas, más un dropout suave al final.
 
@@ -525,9 +492,9 @@ Las piezas son cinco:
 
 Implementá una clase `SimpleConvolution` (subclase de `nn.Module`) cuyo constructor reciba la cantidad de canales de entrada y la cantidad de canales de salida. El bloque tiene que aplicar, en orden:
 
-1. Una primera convolución 3×3 **con padding=1** que mapee de los canales de entrada a los de salida, seguida de una BatchNorm 2D sobre los canales de salida y una ReLU.
-2. Una segunda convolución 3×3 también con padding=1 que mantenga la cantidad de canales (entrada y salida igual a los canales de salida del paso anterior), seguida de otra BatchNorm 2D y otra ReLU.
-3. Un dropout con probabilidad 0.1 al final.
+1. Una primera convolución 3×3 (`nn.Conv2d`) **con padding=1** que mapee de los canales de entrada a los de salida, seguida de una BatchNorm 2D (`nn.BatchNorm2d`) sobre los canales de salida y una ReLU (`nn.ReLU`).
+2. Una segunda convolución 3×3 también con padding=1 que mantenga la cantidad de canales (entrada y salida igual a los canales de salida del paso anterior), seguida de otra `nn.BatchNorm2d` y otra `nn.ReLU`.
+3. Un dropout (`nn.Dropout`) con probabilidad 0.1 al final.
 
 Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, c_out, H, W)` — el padding=1 hace que cada convolución 3×3 preserve exactamente la resolución espacial. La BatchNorm, la ReLU y el Dropout tampoco cambian la forma del tensor.
 
@@ -537,7 +504,7 @@ Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, c_out,
 ::::
 
 
-::::cell{#ej3-code type=code role=student-code}
+::::cell{#ej2-code type=code role=student-code}
 ```python
 # Tu código aquí
 ```
@@ -579,7 +546,7 @@ class SimpleConvolution(nn.Module):
 ::::
 
 
-::::cell{#test-ej3 type=code role=test}
+::::cell{#test-ej2 type=code role=test}
 ```python
 # ─── Test SimpleConvolution ────────────────────────────────────────────────
 # Input chico (1x1x32x32) para que el test apenas use memoria.
@@ -595,11 +562,11 @@ del block, inp, out
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 4 — DownConvolution
+     EJERCICIO 3 — DownConvolution
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej4-enunciado type=markdown role=enunciado}
-### Ejercicio 4 — `DownConvolution`: bajar un nivel
+::::cell{#ej3-enunciado type=markdown role=enunciado}
+### Ejercicio 3 — `DownConvolution`: bajar un nivel
 
 **Objetivo:** Implementar el bloque del camino descendente: primero un maxpool 2×2 que reduce la resolución a la mitad, después una `SimpleConvolution` que actualiza los canales.
 
@@ -609,7 +576,7 @@ del block, inp, out
 
 Implementá una clase `DownConvolution` (subclase de `nn.Module`) cuyo constructor reciba canales de entrada y de salida. El bloque tiene que aplicar, en orden:
 
-1. Un max-pooling 2×2 con stride 2 (divide a la mitad alto y ancho).
+1. Un max-pooling 2×2 (`nn.MaxPool2d`) con stride 2 (divide a la mitad alto y ancho).
 2. El bloque de doble convolución del ejercicio anterior, mapeando de los canales de entrada a los de salida.
 
 Para una entrada de forma `(B, c_in, H, W)` con `H` y `W` pares, la salida tiene que ser `(B, c_out, H/2, W/2)` — la única reducción espacial viene del maxpool, porque la doble convolución preserva resolución.
@@ -618,7 +585,7 @@ Para una entrada de forma `(B, c_in, H, W)` con `H` y `W` pares, la salida tiene
 ::::
 
 
-::::cell{#ej4-code type=code role=student-code}
+::::cell{#ej3-code type=code role=student-code}
 ```python
 # Tu código aquí
 ```
@@ -646,7 +613,7 @@ class DownConvolution(nn.Module):
 ::::
 
 
-::::cell{#test-ej4 type=code role=test}
+::::cell{#test-ej3 type=code role=test}
 ```python
 # ─── Test DownConvolution ──────────────────────────────────────────────────
 block = DownConvolution(16, 32)
@@ -661,11 +628,11 @@ del block, inp, out
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 5 — UpConvolution
+     EJERCICIO 4 — UpConvolution
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej5-enunciado type=markdown role=enunciado}
-### Ejercicio 5 — `UpConvolution`: subir un nivel
+::::cell{#ej4-enunciado type=markdown role=enunciado}
+### Ejercicio 4 — `UpConvolution`: subir un nivel
 
 **Objetivo:** Implementar el bloque del camino ascendente: una `SimpleConvolution` que procesa las features que llegan ya concatenadas, seguida de una **convolución transpuesta** que duplica la resolución espacial.
 
@@ -675,8 +642,8 @@ del block, inp, out
 
 Implementá una clase `UpConvolution` (subclase de `nn.Module`) cuyo constructor reciba canales de entrada y de salida. El bloque tiene que aplicar, en orden:
 
-1. La doble convolución del Ej. 3, que recibe el tensor concatenado (skip + nivel inferior) con los canales de entrada y los baja a los canales de salida. Como la doble convolución preserva la resolución espacial, la salida tiene el mismo alto y ancho que la entrada.
-2. Una convolución transpuesta con kernel 2×2 y stride 2 que duplique la resolución espacial y, además, **reduzca los canales a la mitad** respecto de la salida del paso anterior. La razón de bajar los canales acá: a la salida de este bloque concatenamos con una skip connection del nivel superior que ya tiene esa cantidad de canales — para que al concatenar quede una cantidad redonda (skip + ascendente, cada uno con la mitad), conviene que el ascendente venga ya con la mitad.
+1. La doble convolución del Ej. 2, que recibe el tensor concatenado (skip + nivel inferior) con los canales de entrada y los baja a los canales de salida. Como la doble convolución preserva la resolución espacial, la salida tiene el mismo alto y ancho que la entrada.
+2. Una convolución transpuesta (`nn.ConvTranspose2d`) con kernel 2×2 y stride 2 que duplique la resolución espacial y, además, **reduzca los canales a la mitad** respecto de la salida del paso anterior. La razón de bajar los canales acá: a la salida de este bloque concatenamos con una skip connection del nivel superior que ya tiene esa cantidad de canales — para que al concatenar quede una cantidad redonda (skip + ascendente, cada uno con la mitad), conviene que el ascendente venga ya con la mitad.
 
 Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, c_out // 2, 2H, 2W)` — la doble convolución preserva la resolución y la convolución transpuesta con stride 2 la duplica.
 
@@ -684,7 +651,7 @@ Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, c_out 
 ::::
 
 
-::::cell{#ej5-code type=code role=student-code}
+::::cell{#ej4-code type=code role=student-code}
 ```python
 # Tu código aquí
 ```
@@ -718,7 +685,7 @@ class UpConvolution(nn.Module):
 ::::
 
 
-::::cell{#test-ej5 type=code role=test}
+::::cell{#test-ej4 type=code role=test}
 ```python
 # ─── Test UpConvolution ────────────────────────────────────────────────────
 block = UpConvolution(64, 32)
@@ -734,11 +701,11 @@ del block, inp, out
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 6 — LastConvolution
+     EJERCICIO 5 — LastConvolution
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej6-enunciado type=markdown role=enunciado}
-### Ejercicio 6 — `LastConvolution`: bloque final
+::::cell{#ej5-enunciado type=markdown role=enunciado}
+### Ejercicio 5 — `LastConvolution`: bloque final
 
 **Objetivo:** Implementar el bloque final que cierra la U-Net: `SimpleConvolution` que termina de procesar las features y una **convolución 1×1** que mapea a `num_classes` canales (uno por clase semántica).
 
@@ -748,8 +715,8 @@ del block, inp, out
 
 Implementá una clase `LastConvolution` (subclase de `nn.Module`) cuyo constructor reciba **tres** parámetros: canales de entrada, canales intermedios y número de clases. El bloque tiene que aplicar, en orden:
 
-1. La doble convolución del Ej. 3, que baja los canales de entrada a los canales intermedios (típicamente 64) y preserva la resolución espacial.
-2. Una convolución 1×1 que mezcle esos canales intermedios y produzca un canal por clase. Recordá que la convolución 1×1 tampoco cambia la resolución espacial: actúa como una capa lineal por píxel sobre la dimensión de canales.
+1. La doble convolución del Ej. 2, que baja los canales de entrada a los canales intermedios (típicamente 64) y preserva la resolución espacial.
+2. Una convolución 1×1 (`nn.Conv2d` con `kernel_size=1`) que mezcle esos canales intermedios y produzca un canal por clase. Recordá que la convolución 1×1 tampoco cambia la resolución espacial: actúa como una capa lineal por píxel sobre la dimensión de canales.
 
 Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, num_classes, H, W)` — el alto y ancho se preservan en todo el bloque.
 
@@ -757,7 +724,7 @@ Para una entrada de forma `(B, c_in, H, W)`, la salida tiene que ser `(B, num_cl
 ::::
 
 
-::::cell{#ej6-code type=code role=student-code}
+::::cell{#ej5-code type=code role=student-code}
 ```python
 # Tu código aquí
 ```
@@ -786,7 +753,7 @@ class LastConvolution(nn.Module):
 ::::
 
 
-::::cell{#test-ej6 type=code role=test}
+::::cell{#test-ej5 type=code role=test}
 ```python
 # ─── Test LastConvolution ──────────────────────────────────────────────────
 block = LastConvolution(32, 16, num_classes=3)
@@ -802,11 +769,11 @@ del block, inp, out
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 7 — crop_img
+     EJERCICIO 6 — crop_img
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej7-enunciado type=markdown role=enunciado}
-### Ejercicio 7 — `crop_img`: alinear tensores espacialmente
+::::cell{#ej6-enunciado type=markdown role=enunciado}
+### Ejercicio 6 — `crop_img`: alinear tensores espacialmente
 
 **Objetivo:** Implementar una función auxiliar que recorta un tensor en el centro para que coincida espacialmente con otro.
 
@@ -835,7 +802,7 @@ Pasos sugeridos:
 ::::
 
 
-::::cell{#ej7-code type=code role=student-code}
+::::cell{#ej6-code type=code role=student-code}
 ```python
 # Tu código aquí
 ```
@@ -866,7 +833,7 @@ def crop_img(source_tensor, target_tensor):
 ::::
 
 
-::::cell{#test-ej7 type=code role=test}
+::::cell{#test-ej6 type=code role=test}
 ```python
 # ─── Test crop_img ─────────────────────────────────────────────────────────
 src = torch.rand(1, 16, 32, 32)
@@ -922,11 +889,11 @@ La salida es `(NC, 256, 256)`: por cada píxel del input, `NC` logits que el `ar
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 8 — UNet
+     EJERCICIO 7 — UNet
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej8-enunciado type=markdown role=enunciado}
-### Ejercicio 8 — Clase `UNet`
+::::cell{#ej7-enunciado type=markdown role=enunciado}
+### Ejercicio 7 — Clase `UNet`
 
 **Objetivo:** Ensamblar todos los bloques en la red completa.
 
@@ -934,11 +901,13 @@ La salida es `(NC, 256, 256)`: por cada píxel del input, `NC` logits que el `ar
 
 Implementá una clase `UNet` (subclase de `nn.Module`) cuyo constructor reciba la cantidad de canales de entrada y la cantidad de clases. Tu trabajo es ensamblar los bloques que ya tenés siguiendo la tabla de shapes de la sección C: para cada transición de la tabla, el bloque que la cumple es siempre uno de los que ya implementaste.
 
-**En el `__init__`** declará todos los submódulos que vas a necesitar:
+Para que no te pierdas en el armado, la celda de abajo viene con **el esqueleto de la clase** ya escrito: `__init__` y `forward` están separados en bloques numerados, con los nombres de los submódulos sugeridos (`self.start`, `self.down1..4`, `self.bridge`, `self.up1..3`, `self.last`) y las variables de las skip connections (`skip1..skip4`) ya elegidas. Tu trabajo es completar las llamadas concretas dentro de cada bloque mirando la tabla de shapes.
+
+**En el `__init__`** vas a declarar:
 
 - El bloque inicial que va antes del primer pooling. Es el único que no tiene maxpool delante y mapea de los canales de entrada de la imagen a 64 canales.
 - Cuatro bloques descendentes, uno por nivel del encoder. La tabla te dice los pares de canales de entrada/salida en cada uno (la regla simple: en cada bajada se duplican los canales).
-- El upsampling intermedio entre el fondo de la U y el primer bloque ascendente: la operación que duplica la resolución espacial y baja los canales de 1024 a 512. Se puede armar con una sola convolución transpuesta de kernel 2×2 y stride 2 (no hace falta envolverla en un módulo propio).
+- El upsampling intermedio entre el fondo de la U y el primer bloque ascendente: la operación que duplica la resolución espacial y baja los canales de 1024 a 512. Se puede armar con una sola convolución transpuesta (`nn.ConvTranspose2d`) de kernel 2×2 y stride 2 (no hace falta envolverla en un módulo propio).
 - Tres bloques ascendentes, uno por cada nivel del decoder. Mirá la tabla para deducir qué canales tiene cada uno a la entrada y a la salida — recordá que cada UpConv recibe un tensor concatenado (lado descendente + lado ascendente) y entrega un tensor con la mitad de los canales de salida intermedios, listo para concatenar de nuevo arriba.
 - El bloque final, que mapea a `num_classes` canales.
 
@@ -948,13 +917,60 @@ Implementá una clase `UNet` (subclase de `nn.Module`) cuyo constructor reciba l
 2. Aplicá el upsampling intermedio.
 3. Concatená con la skip del nivel correspondiente y aplicá el siguiente bloque ascendente. Repetí tres veces y cerrá con el bloque final. Como las convs preservan resolución (gracias al `padding=1`), las skips y los feature maps ascendentes ya cuadran espacialmente — concatenan directamente, sin recortar.
 
-> **Pista:** En PyTorch hay una función para concatenar una lista de tensores sobre un eje. Para una pila `(B, C, H, W)` el eje de canales es el `dim=1`.
+> **Pista:** Para concatenar una lista de tensores sobre un eje usá `torch.cat([...], dim=...)`. Para una pila `(B, C, H, W)` el eje de canales es `dim=1`.
 ::::
 
 
-::::cell{#ej8-code type=code role=student-code}
+::::cell{#ej7-code type=code role=student-code}
 ```python
-# Tu código aquí
+class UNet(nn.Module):
+    """
+    U-Net moderna (variante con padding=1 + BatchNorm).
+
+    Entrada: (B, input_channel, 256, 256)  → Salida: (B, num_classes, 256, 256)
+    """
+    def __init__(self, input_channel, num_classes):
+        super().__init__()
+        # ─── Encoder: bloque inicial + 4 DownConvolution ────────────────────
+        # Mirá la tabla de shapes (sección C) para los pares (in, out).
+        # Nombres sugeridos: self.start, self.down1, self.down2, self.down3, self.down4
+        # Tu código aquí
+
+        # ─── Bridge: ConvTranspose2d entre el fondo y el primer UpConvolution
+        # Sube la resolución de (1024, 16, 16) a (512, 32, 32) usando
+        # kernel_size=2 y stride=2. Nombre sugerido: self.bridge
+        # Tu código aquí
+
+        # ─── Decoder: 3 UpConvolution + bloque final ────────────────────────
+        # Mirá la tabla de shapes para los pares (in, out) de cada UpConv.
+        # Recordá que cada UpConv recibe un tensor concatenado (skip + abajo).
+        # Nombres sugeridos: self.up1, self.up2, self.up3, self.last
+        # Tu código aquí
+
+    def forward(self, x):
+        # ─── Bajada: aplicá los 5 bloques del encoder ───────────────────────
+        # Guardá las salidas de los CUATRO PRIMEROS niveles como skip
+        # connections — las vas a usar al subir. El quinto nivel (down4) NO
+        # necesita skip: es el fondo de la U.
+        # skip1 = ...                # salida de self.start
+        # skip2 = ...                # salida de self.down1
+        # skip3 = ...                # salida de self.down2
+        # skip4 = ...                # salida de self.down3
+        # x     = ...                # salida de self.down4 (fondo de la U)
+        # Tu código aquí
+
+        # ─── Subida: bridge + 3 UpConvolution + bloque final ────────────────
+        # Para concatenar usá torch.cat([..., ...], dim=1).
+        # Mirá la tabla: en cada paso ascendente concatenás con la skip del
+        # mismo nivel ANTES de pasar por el UpConvolution / LastConvolution.
+        # x = self.bridge(x)
+        # x = self.up1(...)          # concat con skip4
+        # x = self.up2(...)          # concat con skip3
+        # x = self.up3(...)          # concat con skip2
+        # x = self.last(...)         # concat con skip1
+        # Tu código aquí
+
+        return x
 ```
 
 ```python solution
@@ -1012,7 +1028,7 @@ class UNet(nn.Module):
 ::::
 
 
-::::cell{#test-ej8 type=code role=test}
+::::cell{#test-ej7 type=code role=test}
 ```python
 # ─── Test UNet ─────────────────────────────────────────────────────────────
 # Test con num_classes=3 e input chico para no quemar memoria. Verificamos
@@ -1031,14 +1047,14 @@ del unet_test, inp, out
 ::::
 
 
-::::cell{#ej8-pregunta type=markdown role=pregunta}
+::::cell{#ej7-pregunta type=markdown role=pregunta}
 **Pregunta de análisis:**
 
 La U-Net que implementaste tiene dos diferencias clave respecto de la del paper original (Ronneberger 2015): nuestras convoluciones 3×3 usan `padding=1` (las del paper no tenían padding), y agregamos `BatchNorm2d` después de cada `Conv2d` (el paper no la usaba). Para cada uno de esos cambios, indicá qué consecuencia tiene en la forma del output (input 572×572 vs nuestro 256×256) y/o en el comportamiento del entrenamiento.
 ::::
 
 
-::::cell{#ej8-respuesta type=markdown role=student-answer}
+::::cell{#ej7-respuesta type=markdown role=student-answer}
 *(Escribí tu respuesta acá)*
 
 ```markdown solution
@@ -1069,7 +1085,7 @@ El paper de 2015 no usaba ninguna de las dos cosas porque trabajaba sobre datase
 Antes de empezar a entrenar, hay dos cosas que solemos pasar por alto y que importan particularmente en segmentación:
 
 1. **Liberar memoria.** Las celdas de test crearon tensores y modelos pequeños que pueden quedar referenciados todavía. En GPU eso se nota porque cuando creamos la U-Net "real" puede aparecer un OOM si la suma del modelo nuevo + lo que quedó de los tests se pasa de la VRAM de la T4 (~15 GB).
-2. **Pesos por clase.** Como vimos en el Ej. 1, el fondo domina el dataset. Sin pesos, la red converge a "todo es fondo". Vamos a calcular los pesos como `1 / frecuencia_de_clase` y pasarlos a la cross-entropy.
+2. **Pesos por clase.** Como ya señalamos al mirar los trimaps al inicio de la sección A, el fondo domina el dataset (~70% de los píxeles). Sin pesos, la red converge a "todo es fondo". Vamos a calcular los pesos como `1 / frecuencia_de_clase` y pasarlos a la cross-entropy.
 ::::
 
 
@@ -1102,35 +1118,33 @@ La receta es:
 
 Lo usamos pasándole el vector de pesos a `nn.CrossEntropyLoss(weight=weights, ignore_index=255)`.
 
-> **Por qué `1/√freq` y no `1/freq` directamente:** `1/freq` parece la opción "natural" pero produce pesos demasiado desbalanceados cuando hay diferencias grandes de frecuencia entre clases. En datasets multiclase desbalanceados (como VOC2012, donde el fondo ocupa ~66% y las 20 clases minoritarias se reparten el resto) el ratio entre el peso máximo y mínimo llega a ~170×. Bajo esa pérdida la red descubre rápido que **nunca conviene predecir la clase mayoritaria**: equivocarse en un píxel minoritario cuesta cientísimo más, así que la política óptima es repartirse las minoritarias y nunca predecir la dominante. El resultado es una red que tiene accuracy de pixel mucho peor que predecir todo "fondo".
->
-> Tomar la **raíz cuadrada** de la frecuencia comprime el rango: en nuestro caso (Pet, fondo ~0.70 / mascota ~0.30) el ratio entre pesos pasa de ~2.3× con `1/freq` a ~1.5× con `1/√freq`. Más importante todavía, en problemas multiclase fuertemente desbalanceados la diferencia es enorme — `1/√freq` mantiene los pesos en un rango razonable. Es la receta que usan, por ejemplo, ENet (Paszke et al. 2016) y SegNet (Badrinarayanan et al. 2017) en sus respectivos papers de segmentación.
+> **Por qué `1/√freq` y no `1/freq` directamente:** `1/freq` parece la opción "natural" pero produce pesos demasiado desbalanceados. Si el fondo es 10× más frecuente que la mascota, con `1/freq` los pesos quedan en ratio 10:1 — la red descubre rápido que conviene **nunca** predecir fondo (un error en un píxel minoritario cuesta diez veces más) y termina con accuracy de píxel peor que la baseline trivial. La **raíz cuadrada** comprime ese rango: el mismo ratio 10× de frecuencias da pesos 3.16:1, agresivos pero no tóxicos. En nuestro caso (Pet, fondo ~0.70 / mascota ~0.30) el ratio max/min entre pesos pasa de ~2.3× con `1/freq` a ~1.5× con `1/√freq`. Es la receta que usan, por ejemplo, ENet (Paszke et al. 2016) y SegNet (Badrinarayanan et al. 2017) en sus papers de segmentación.
 ::::
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 9 — Entrenamiento con pesos por clase
+     EJERCICIO 8 — Entrenamiento con pesos por clase
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej9-enunciado type=markdown role=enunciado}
-### Ejercicio 9 — Entrenamiento de la U-Net (prueba inicial desde cero)
+::::cell{#ej8-enunciado type=markdown role=enunciado}
+### Ejercicio 8 — Entrenamiento de la U-Net (prueba inicial desde cero)
 
-**Objetivo:** Calcular los pesos por clase, definir la función de pérdida ponderada y entrenar la U-Net sobre Pet **desde cero** (con pesos inicializados al azar) por unas pocas epochs. La idea es confirmar que la arquitectura arranca y produce predicciones útiles — no obtener el mejor modelo posible. En el Ej. 11 vamos a repetir el experimento partiendo de un encoder pre-entrenado y comparar resultados.
+**Objetivo:** Calcular los pesos por clase, definir la función de pérdida ponderada y entrenar la U-Net sobre Pet **desde cero** (con pesos inicializados al azar) por unas pocas epochs. La idea es confirmar que la arquitectura arranca y produce predicciones útiles — no obtener el mejor modelo posible. En el Ej. 10 vamos a repetir el experimento partiendo de un encoder pre-entrenado y comparar resultados.
 
 > ⚠️ **Atención al tiempo de entrenamiento:** este ejercicio entrena la U-Net por **4 epochs** sobre las 1500 imágenes del subset. En **GPU T4 de Colab tarda aproximadamente 5-7 minutos**.
 >
-> ¿Por qué solo 4 epochs y no 12 o 20? Porque el cuello de botella **no es la cantidad de iteraciones**: una U-Net de 31M de parámetros entrenada desde cero sobre 1500 imágenes sigue convergiendo lento aunque le des una hora. Con 4 epochs ya vemos la tendencia (sale del baseline trivial de "todo fondo") y nos sobra tiempo para el fine-tuning del Ej. 11, que es donde realmente se ve qué saca al modelo del estancamiento.
+> ¿Por qué solo 4 epochs y no 12 o 20? Porque el cuello de botella **no es la cantidad de iteraciones**: una U-Net de 31M de parámetros entrenada desde cero sobre 1500 imágenes sigue convergiendo lento aunque le des una hora. Con 4 epochs ya vemos la tendencia (sale del baseline trivial de "todo fondo") y nos sobra tiempo para el fine-tuning del Ej. 10, que es donde realmente se ve qué saca al modelo del estancamiento.
 
 **Enunciado:**
 
 Esta es la celda principal de entrenamiento desde cero. Tiene varias partes; el código tiene la estructura armada con bloques numerados, completá los huecos donde dice `# Tu código aquí`.
 
-1. **Conteo de píxeles por clase:** recorré el dataset de train acumulando, para cada clase, cuántos píxeles aparecen en total. Excluí los píxeles marcados como ignorables. Esto puede tardar 1-2 minutos porque toca abrir cada imagen del dataset.
-2. **Pesos:** calculá la frecuencia relativa de cada clase y armá un vector de pesos inversamente proporcional a la **raíz cuadrada** de esa frecuencia (cuidado con dividir por cero — sumá un epsilon chico adentro de la raíz). La raíz suaviza el desbalance respecto a `1/freq` puro, que produce pesos demasiado agresivos — la justificación está arriba en el bloque de scaffolding. Normalizá los pesos para que su suma sea igual al número de clases (eso mantiene la pérdida en un orden de magnitud razonable y evita tener que retunear el learning rate). Convertilo a tensor de PyTorch.
+1. **Conteo de píxeles por clase (PRE-RESUELTO):** la celda viene con esta parte ya implementada — recorre `pet_train`, acumula cuántos píxeles tiene cada clase descartando los `IGNORE_INDEX`, y arma una pequeña tabla de frecuencias. Tarda 1-2 minutos la primera vez. No hay nada que completar; pasá a la parte 2 cuando termine de imprimir.
+2. **Pesos:** la celda viene con las dos primeras líneas pre-resueltas (cálculo de la frecuencia relativa `class_freq` y del peso crudo `raw_w = 1/√(class_freq + ε)` — receta directa que ya está justificada arriba en el bloque de scaffolding). Lo que **tenés que hacer vos** es el último paso: normalizar `raw_w` para que sus valores sumen exactamente `NUM_CLASSES` (eso mantiene la pérdida en un orden de magnitud razonable y evita retunear el learning rate) y guardarlo como tensor PyTorch en una variable llamada **`weights`** (`dtype=torch.float32`).
 3. **Modelo, loss y optimizador:**
    - Instanciá la U-Net con 3 canales de entrada y `NUM_CLASSES` de salida, y mandala al `device`.
-   - Definí la pérdida como cross-entropy multiclase **ponderada** con los pesos del paso anterior. Asegurate de pasarle también la opción para que ignore los píxeles marcados con `IGNORE_INDEX` — sin eso, los píxeles del borde contribuyen al gradiente como si fueran clase 255 (que ni siquiera existe) y rompen el entrenamiento.
-   - Como optimizador usá Adam con learning rate 1e-3.
+   - Definí la pérdida como cross-entropy multiclase **ponderada** (`nn.CrossEntropyLoss`) con los pesos del paso anterior. Asegurate de pasarle también la opción para que ignore los píxeles marcados con `IGNORE_INDEX` — sin eso, los píxeles del borde contribuyen al gradiente como si fueran clase 255 (que ni siquiera existe) y rompen el entrenamiento.
+   - Como optimizador usá Adam (`torch.optim.Adam`) con learning rate 1e-3.
 4. **Loop de entrenamiento:** entrená por 4 epochs. En cada epoch:
    - Modo train. Para cada batch del iterador de train:
      - Mandá imagen y máscara al device. Convertí la máscara a `long` (la cross-entropy exige índices enteros como target).
@@ -1139,31 +1153,84 @@ Esta es la celda principal de entrenamiento desde cero. Tiene varias partes; el 
      - Acumulá lo necesario para reportar pérdida promedio y accuracy de pixel al final del epoch.
    - Modo eval. Recorré el iterador de validación midiendo accuracy de pixel sobre val. No olvides envolver el bloque en un contexto `no_grad` para no acumular gradientes inútilmente.
    - Imprimí una línea por epoch con `epoch | train_loss | train_acc | val_acc`.
-   - **Guardá el `val_acc` de cada epoch en una lista llamada `val_acc_history`** — la vamos a comparar con los resultados del Ej. 11 (fine-tuning).
+   - **Guardá el `val_acc` de cada epoch en una lista llamada `val_acc_history`** — la vamos a comparar con los resultados del Ej. 10 (fine-tuning).
 
 > **Pista — accuracy de pixel:** comparar `prediccion == ground_truth` (después del `argmax` sobre canales) te da un tensor booleano. Sumá los `True` y dividí por la cantidad de píxeles "no-ignorables". Para excluir del conteo los píxeles `IGNORE_INDEX`, hacé un AND con una máscara booleana que marque los píxeles válidos del ground truth.
 >
-> **Nota — qué esperar:** con la receta del lab (subset de 1500 imágenes, 4 epochs, U-Net con padding=1 + BatchNorm, pesos `1/√freq`, augmentation por flip horizontal) `val_acc` debería arrancar en ~0.72-0.78 en epoch 1 y llegar a **~0.78-0.85** en epoch 4. La línea de base "predecir todo fondo" sería ~0.70, así que cualquier valor claramente por encima indica que la red discrimina mascota de fondo, aunque sea de forma rudimentaria. Los resultados verdaderamente buenos van a aparecer en el Ej. 11.
+> **Nota — qué esperar:** con la receta del lab (subset de 1500 imágenes, 4 epochs, U-Net con padding=1 + BatchNorm, pesos `1/√freq`, augmentation por flip horizontal) `val_acc` debería arrancar en ~0.72-0.78 en epoch 1 y llegar a **~0.78-0.85** en epoch 4. La línea de base "predecir todo fondo" sería ~0.70, así que cualquier valor claramente por encima indica que la red discrimina mascota de fondo, aunque sea de forma rudimentaria. Los resultados verdaderamente buenos van a aparecer en el Ej. 10.
 ::::
 
 
-::::cell{#ej9-code type=code role=student-code}
+::::cell{#ej8-code type=code role=student-code}
 ```python
-# ─── 1) Conteo de píxeles por clase ─────────────────────────────────────────
-# Recorremos pet_train y vamos sumando los píxeles de cada clase, ignorando
-# los píxeles marcados como IGNORE_INDEX.
+# ─── 1) Conteo de píxeles por clase (PRE-RESUELTO) ──────────────────────────
+# Recorremos pet_train acumulando cuántos píxeles tiene cada clase. Ignoramos
+# los píxeles marcados como IGNORE_INDEX. Tarda 1-2 min la primera vez (toca
+# abrir cada imagen del dataset).
+freqs = Counter()
+for _, mask in pet_train:
+    valid = mask[mask != IGNORE_INDEX]
+    unique, counts = torch.unique(valid, return_counts=True)
+    for c, n in zip(unique.tolist(), counts.tolist()):
+        freqs[c] += n
+total_pixels = sum(freqs.values())
+print(f"Píxeles totales (sin IGNORE_INDEX): {total_pixels:,}")
 
+df = pd.DataFrame({
+    "clase":   PET_CLASSES,
+    "píxeles": [freqs.get(i, 0) for i in range(NUM_CLASSES)],
+    "freq":    [round(freqs.get(i, 0) / total_pixels, 4)
+                for i in range(NUM_CLASSES)],
+})
+print(df.to_string(index=False))
+
+# ─── 2) Pesos: 1 / sqrt(freq) normalizado a sumar NUM_CLASSES ──────────────
+# Las dos primeras líneas vienen pre-resueltas porque son receta directa.
+# Lo que tenés que hacer vos es la NORMALIZACIÓN final + convertir a tensor.
+class_freq = np.array([freqs.get(i, 0) / total_pixels
+                       for i in range(NUM_CLASSES)])
+raw_w = 1.0 / np.sqrt(class_freq + 1e-6)            # epsilon evita 0/0
+
+# ── Escalá `raw_w` para que sus valores sumen exactamente NUM_CLASSES.
+# Pista: si querés que un vector v sume a S, multiplicalo por S / v.sum().
+# Convertí el resultado a torch.tensor float32 y guardalo en `weights`.
 # Tu código aquí
+# weights = ...
 
-# ─── 2) Pesos: 1 / freq normalizado a sumar NUM_CLASSES ─────────────────────
-
-# Tu código aquí
+# Imprimimos los pesos resultantes para verificar (no toques esto).
+print(f"\nPesos por clase (normalizados a sumar NUM_CLASSES={NUM_CLASSES}):")
+for i, n in enumerate(PET_CLASSES):
+    print(f"  {n:14s}  freq={class_freq[i]:.4f}  weight={weights[i].item():.3f}")
 
 # ─── 3) Modelo, loss y optimizador ──────────────────────────────────────────
+# - model: UNet(input_channel=3, num_classes=NUM_CLASSES) en device.
+# - criterion: nn.CrossEntropyLoss(weight=..., ignore_index=IGNORE_INDEX).
+#   Acordate de mover los pesos al device.
+# - optimizer: torch.optim.Adam con lr=1e-3.
 
 # Tu código aquí
 
 # ─── 4) Loop de entrenamiento (4 epochs, guardando val_acc_history) ────────
+# Estructura sugerida:
+#   num_epochs = 4
+#   val_acc_history = []
+#   for epoch in range(num_epochs):
+#       model.train()
+#       L_sum, n_correct, n_valid = 0.0, 0, 0
+#       for X, y in train_iter:
+#           ... mover a device, y.long(), forward, loss, backward, step, zero_grad
+#           ... actualizar L_sum, n_correct, n_valid usando la máscara (y != IGNORE_INDEX)
+#       train_loss = L_sum / len(pet_train)
+#       train_acc  = n_correct / n_valid
+#
+#       model.eval()
+#       n_correct_v, n_valid_v = 0, 0
+#       with torch.no_grad():
+#           for X, y in val_iter:
+#               ... forward, argmax, contar correctos sobre píxeles válidos
+#       val_acc = n_correct_v / n_valid_v
+#       val_acc_history.append(val_acc)
+#       print(f"epoch {epoch+1}/{num_epochs}  train_loss=...  train_acc=...  val_acc=...")
 
 # Tu código aquí
 ```
@@ -1223,7 +1290,7 @@ print(f"\nParámetros del modelo: "
       f"{sum(p.numel() for p in model.parameters()):,}")
 
 # ─── 4) Loop de entrenamiento ───────────────────────────────────────────────
-# Guardamos val_acc por epoch para comparar después con el fine-tuning del Ej. 11.
+# Guardamos val_acc por epoch para comparar después con el fine-tuning del Ej. 10.
 num_epochs = 4
 val_acc_history = []
 for epoch in range(num_epochs):
@@ -1273,14 +1340,14 @@ for epoch in range(num_epochs):
 ::::
 
 
-::::cell{#ej9-pregunta type=markdown role=pregunta}
+::::cell{#ej8-pregunta type=markdown role=pregunta}
 **Pregunta de análisis:**
 
 Si en lugar de usar pesos por clase entrenaras la misma red con `nn.CrossEntropyLoss()` "plana" (sin `weight`), ¿qué esperarías que pase con la **accuracy de pixel global** y con la **accuracy de pixel sobre la mascota**? Justificá.
 ::::
 
 
-::::cell{#ej9-respuesta type=markdown role=student-answer}
+::::cell{#ej8-respuesta type=markdown role=student-answer}
 *(Escribí tu respuesta acá)*
 
 ```markdown solution
@@ -1310,33 +1377,139 @@ Ya tenemos un modelo entrenado. Vamos a usarlo para producir máscaras predichas
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 10 — Predicción
+     EJERCICIO 9 — Predicción
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej10-enunciado type=markdown role=enunciado}
-### Ejercicio 10 — Visualizar predicciones
+::::cell{#ej9-enunciado type=markdown role=enunciado}
+### Ejercicio 9 — Visualizar predicciones
 
 **Objetivo:** Tomar imágenes del split de validación, predecir sus máscaras con la red entrenada y mostrar la triple "imagen original / predicción / ground truth" para inspeccionar visualmente qué tan bien funciona el modelo.
 
 **Enunciado:**
 
-1. Implementá una función `label2image` que reciba un tensor 2D `(H, W)` con índices de clase y devuelva un tensor 3D `(H, W, 3)` con los colores RGB correspondientes según `PET_COLORMAP`. Para los píxeles marcados como `IGNORE_INDEX`, podés pintar un color "neutro" (gris) — no es crítico porque son pocos.
-2. Tomá 4 imágenes del split de test con la función que implementaste en el Ej. 1.
-3. Para cada imagen:
-   - Recortá un parche 256×256 **desde el centro** de la imagen, tanto en la imagen como en el trimap correspondiente. Centrar el recorte (en lugar de tomarlo desde una esquina) maximiza la chance de que la mascota quede dentro del cuadro — en Pet los animales suelen estar centrados en la foto.
-   - Normalizá la imagen con la misma media/std de ImageNet que usaba el dataset durante el entrenamiento.
-   - Pasala por la red en modo eval, dentro de un bloque `no_grad`, y quedate con la clase de mayor logit por píxel (`argmax` sobre la dimensión de canales).
-   - Convertí la predicción a imagen RGB con `label2image`. Hacé lo mismo con el ground truth: ojo que el trimap viene con valores `{1, 2, 3}` y nuestro modelo predice `{0, 1}` — vas a tener que aplicar el mismo mapeo que hace el `PetSegDataset` (`2→0`, `1→1`, `3→IGNORE_INDEX`) antes de visualizar.
-4. Armá la visualización **separada en dos figuras** de 2 filas cada una (no una sola figura de 4 filas). Cada figura tiene tres columnas: imagen (256×256), predicción (256×256) y ground truth (256×256). Las tres tienen la misma resolución porque la U-Net con padding preserva la forma espacial. Separar en dos figuras hace que cada una sea más cómoda de leer en pantalla y mantiene la leyenda cerca de las imágenes a las que aplica.
-5. Llamá a `add_seg_legend(fig)` (helper preescrito en el setup) en **cada** figura, para que ambas tengan arriba una leyenda con el color de cada clase. Sin la leyenda mirando la grilla no se sabe qué clase representa cada color.
+La celda viene con dos ayudas pre-resueltas para que te concentres en la parte que importa:
+
+- `trimap_to_index` — el mapeo trimap `{1, 2, 3}` → índices `{1, 0, 255}` (es exactamente el mismo que aplica `PetSegDataset.__getitem__`; reimplementarlo no aporta nada).
+- El armado de las dos figuras y la llamada a `add_seg_legend` en cada una — boilerplate de matplotlib.
+
+Lo que tenés que completar:
+
+1. **`label2image`** — función que recibe un tensor 2D `(H, W)` con índices de clase y devuelve un tensor 3D `(H, W, 3)` con los colores RGB correspondientes según `PET_COLORMAP`. Para los píxeles marcados como `IGNORE_INDEX`, podés pintar un color "neutro" (gris) — no es crítico porque son pocos.
+2. **`predict_and_render`** — función que toma un índice y la fila de axes donde dibujar. Tu trabajo dentro:
+   - Recortá un parche 256×256 **desde el centro** de la imagen y del trimap. Centrar el recorte (en lugar de tomarlo desde una esquina) maximiza la chance de que la mascota quede dentro del cuadro.
+   - Normalizá la imagen con la misma media/std de ImageNet que usaba el dataset durante el entrenamiento (la celda ya define un objeto `norm` con esos valores).
+   - Pasala por la red en modo eval (dentro de un bloque `no_grad`) y quedate con la clase de mayor logit por píxel (`argmax` sobre canales).
+   - Mapeá el ground truth con `trimap_to_index` (ya provisto) antes de visualizar — el trimap viene con valores `{1, 2, 3}` y nuestro modelo predice `{0, 1}`.
+   - Dibujá en las tres axes recibidas: imagen, predicción y ground truth (usando `label2image` para los dos últimos).
 
 > **Pista:** En `torchvision.transforms.functional` hay una función `crop` que toma una imagen y devuelve un crop a partir de coordenadas `top`, `left`, `height` y `width`. Para centrar el crop usá `top = (H - 256) // 2` y `left = (W - 256) // 2`.
+>
+> **Nota:** la celda ya incluye un mini "resize de seguridad" para imágenes más chicas que 256×256 (raro en Pet, pero hay un puñado). Eso te lo dejamos hecho.
 ::::
 
 
-::::cell{#ej10-code type=code role=student-code}
+::::cell{#ej9-code type=code role=student-code}
 ```python
-# Tu código aquí
+# ─── 1) label2image: índices de clase → imagen RGB ─────────────────────────
+def label2image(pred):
+    """
+    Mapea un tensor 2D (H, W) de índices de clase a una imagen RGB (H, W, 3)
+    usando PET_COLORMAP. Los píxeles IGNORE_INDEX se pintan de gris.
+
+    Idea clave: en PyTorch podés indexar un tensor con otro tensor de
+    índices ("fancy indexing"). Si tenés `colormap` de forma (NC, 3) y
+    `pred` de forma (H, W) con valores 0..NC-1, entonces
+    `colormap[pred.long()]` te devuelve un tensor (H, W, 3) con cada
+    píxel pintado del color RGB de su clase.
+    """
+    # Convertimos PET_COLORMAP a tensor (NUM_CLASSES, 3) uint8 (PRE-RESUELTO).
+    colormap = torch.tensor(PET_COLORMAP, device=pred.device, dtype=torch.uint8)
+
+    # Los píxeles IGNORE_INDEX (=255) están fuera del rango 0..NC-1 y
+    # romperían el indexing. Los pasamos a 0 en una COPIA — después
+    # parcheamos esos píxeles a gris en el resultado (PRE-RESUELTO).
+    safe = pred.clone()
+    safe[safe == IGNORE_INDEX] = 0
+
+    # ── Indexá `colormap` con `safe.long()` para obtener `img` (H, W, 3).
+    # Tu código aquí
+    # img = ...
+
+    # ── Pintá de gris (128, 128, 128) los píxeles donde `pred == IGNORE_INDEX`.
+    # Pista: podés asignar un tensor de tres valores RGB usando indexación
+    # booleana sobre `img`.
+    # Tu código aquí
+
+    return img.cpu()
+
+
+# ─── trimap_to_index: trimap {1,2,3} → índices {1, 0, 255}  (PRE-RESUELTO) ─
+def trimap_to_index(trimap):
+    """Mismo mapeo que aplica PetSegDataset.__getitem__."""
+    out = torch.full_like(trimap, IGNORE_INDEX)
+    out[trimap == 2] = 0
+    out[trimap == 1] = 1
+    return out
+
+
+# ─── 2) Lectura de imágenes + transformación de normalización ──────────────
+n = 4
+test_imgs, test_masks = read_pet_images(pet_dir, n, split='test')
+model.eval()
+
+# Misma media/std que aplicaba PetSegDataset durante el train.
+norm = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225])
+
+
+def predict_and_render(idx, ax_row):
+    """Procesa la imagen idx-ésima y la dibuja en la fila de axes dada."""
+    img_t = test_imgs[idx]
+    msk_t = test_masks[idx].squeeze(0)            # (1, H, W) → (H, W)
+    H, W = img_t.shape[1], img_t.shape[2]
+
+    # Resize de seguridad si la imagen es más chica que 256 (PRE-RESUELTO).
+    if H < 256 or W < 256:
+        f = max(256 / H, 256 / W) * 1.1
+        img_t = transforms.functional.resize(
+            img_t, [int(H * f), int(W * f)], antialias=True)
+        msk_t = transforms.functional.resize(
+            msk_t.unsqueeze(0), [int(H * f), int(W * f)],
+            interpolation=transforms.InterpolationMode.NEAREST).squeeze(0)
+        H, W = img_t.shape[1], img_t.shape[2]
+
+    # ── Centro-crop 256x256 sobre img_t y msk_t.
+    # Tu código aquí
+    # img_crop  = ...
+    # mask_crop = ...
+
+    # ── Normalizá img_crop con `norm`, agregá dimensión de batch, mandá al
+    # device. Pasalo por la red en modo eval (no_grad) y tomá el argmax
+    # sobre canales para obtener `pred` (256, 256).
+    # Tu código aquí
+    # X    = ...
+    # pred = ...
+
+    # ── Ground truth: usá trimap_to_index(mask_crop.long()).
+    # Tu código aquí
+    # gt_idx = ...
+
+    # ── Dibujo en las 3 axes: imagen / predicción / ground truth.
+    # Recordá que matplotlib espera (H, W, C). Para la imagen usá
+    # img_crop.permute(1, 2, 0). Para pred y gt_idx usá label2image(...).
+    # Tu código aquí
+
+
+# ─── 3) Dos figuras de 2 filas cada una (PRE-RESUELTO) ─────────────────────
+ROWS_PER_FIG = 2
+with torch.no_grad():
+    for fig_idx in range(0, n, ROWS_PER_FIG):
+        fig, axs = plt.subplots(ROWS_PER_FIG, 3, figsize=(12, 4 * ROWS_PER_FIG))
+        for r in range(ROWS_PER_FIG):
+            predict_and_render(fig_idx + r, axs[r])
+        add_seg_legend(fig)
+        plt.tight_layout(rect=[0, 0, 1, 0.94])
+        plt.show()
 ```
 
 ```python solution
@@ -1439,14 +1612,14 @@ with torch.no_grad():
 ::::
 
 
-::::cell{#ej10-pregunta type=markdown role=pregunta}
+::::cell{#ej9-pregunta type=markdown role=pregunta}
 **Pregunta de análisis:**
 
-Comparando las predicciones con el ground truth: ¿en qué tipo de regiones la red anda mejor (zonas amplias del cuerpo, fondos uniformes, etc.) y en cuáles peor (bordes finos, patas y orejas, mascotas chicas en el cuadro)? Proponé al menos dos mejoras concretas del pipeline (datos, arquitectura o entrenamiento) que apunten a los puntos débiles que detectes.
+Comparando las predicciones con el ground truth: ¿en qué regiones de la imagen la red funciona mejor y en cuáles peor? Proponé al menos dos mejoras concretas del pipeline (datos, arquitectura o entrenamiento) que apunten a los puntos débiles que detectes.
 ::::
 
 
-::::cell{#ej10-respuesta type=markdown role=student-answer}
+::::cell{#ej9-respuesta type=markdown role=student-answer}
 *(Escribí tu respuesta acá)*
 
 ```markdown solution
@@ -1466,7 +1639,7 @@ Patrón típico observado tras la prueba inicial de 4 epochs sobre Pet (subset 1
 - **Diferencias de raza muy distintas a las del subset de train** — entrenamos con 1500 imágenes elegidas al azar; algunas razas están subrepresentadas. Si en val aparece una raza con apariencia atípica, la red la generaliza peor.
   - *Mejora posible:* entrenar con el dataset completo (3680 imágenes), aceptando los ~40 minutos de cómputo, o aplicar augmentation más diversa (color jitter es trivial).
 
-**Mejora general:** los modelos de segmentación de producción rara vez son U-Net puras desde cero — usan backbones pre-entrenados (ResNet, EfficientNet, ViT) en el encoder y agregan multi-scale features (ASPP, FPN). En el Ej. 11 vamos a aplicar exactamente la primera de esas mejoras (encoder ResNet pre-entrenado en ImageNet) y vas a ver el salto cualitativo respecto a esta prueba inicial.
+**Mejora general:** los modelos de segmentación de producción rara vez son U-Net puras desde cero — usan backbones pre-entrenados (ResNet, EfficientNet, ViT) en el encoder y agregan multi-scale features (ASPP, FPN). En el Ej. 10 vamos a aplicar exactamente la primera de esas mejoras (encoder ResNet pre-entrenado en ImageNet) y vas a ver el salto cualitativo respecto a esta prueba inicial.
 ```
 ::::
 
@@ -1475,7 +1648,7 @@ Patrón típico observado tras la prueba inicial de 4 epochs sobre Pet (subset 1
 ---
 ## Sección F: Fine-tuning desde una U-Net pre-entrenada
 
-Hasta acá entrenamos la U-Net **desde cero**. La prueba inicial del Ej. 9 muestra que la red arranca — supera el baseline trivial de "todo fondo" — pero los resultados son modestos y las predicciones del Ej. 10 lo confirman: blobs aproximados, contornos imprecisos, mascotas chicas que se diluyen. La razón es bien conocida: una red profunda con ~31M de parámetros no puede aprender features visuales útiles a partir de 1500 imágenes. Necesitaría órdenes de magnitud más datos, mucho más cómputo, augmentation pesada o todo lo anterior.
+Hasta acá entrenamos la U-Net **desde cero**. La prueba inicial del Ej. 8 muestra que la red arranca — supera el baseline trivial de "todo fondo" — pero los resultados son modestos y las predicciones del Ej. 9 lo confirman: blobs aproximados, contornos imprecisos, mascotas chicas que se diluyen. La razón es bien conocida: una red profunda con ~31M de parámetros no puede aprender features visuales útiles a partir de 1500 imágenes. Necesitaría órdenes de magnitud más datos, mucho más cómputo, augmentation pesada o todo lo anterior.
 
 La receta práctica de la última década resuelve esto con **transfer learning**: en lugar de inicializar los pesos del encoder al azar, se reemplazan por los pesos de una red pre-entrenada sobre ImageNet (1.2 millones de imágenes naturales etiquetadas con 1000 clases). El encoder ya viene "sabiendo" extraer bordes, texturas y partes de objetos — y solo hay que afinar esos features para la tarea específica de segmentación. Las primeras epochs del fine-tuning ya producen resultados que el train desde cero no alcanza ni con muchísimas más epochs.
 
@@ -1488,8 +1661,8 @@ Para implementarlo vamos a usar la librería `segmentation_models_pytorch` (smp)
 ::::cell{#setup-cleanup-ft type=code role=setup}
 ```python
 # ─── Limpieza antes del fine-tuning ─────────────────────────────────────────
-# Vamos a tener dos modelos en GPU al mismo tiempo (el desde cero del Ej. 9
-# y el fine-tuning del Ej. 11) porque después los comparamos en visualización.
+# Vamos a tener dos modelos en GPU al mismo tiempo (el desde cero del Ej. 8
+# y el fine-tuning del Ej. 10) porque después los comparamos en visualización.
 # Forzamos GC y vaciamos la cache de CUDA antes de instanciar el segundo.
 gc.collect()
 if torch.cuda.is_available():
@@ -1502,60 +1675,129 @@ if torch.cuda.is_available():
 
 
 <!-- ──────────────────────────────────────────────────────────────────────
-     EJERCICIO 11 — Fine-tuning con smp.Unet
+     EJERCICIO 10 — Fine-tuning con smp.Unet
      ────────────────────────────────────────────────────────────────────── -->
 
-::::cell{#ej11-enunciado type=markdown role=enunciado}
-### Ejercicio 11 — Fine-tuning de una U-Net con encoder pre-entrenado
+::::cell{#ej10-enunciado type=markdown role=enunciado}
+### Ejercicio 10 — Fine-tuning de una U-Net con encoder pre-entrenado
 
 **Objetivo:** Repetir el entrenamiento de la Sección D pero partiendo de una U-Net cuyo encoder está pre-entrenado sobre ImageNet, comparar cuantitativa y visualmente con la red entrenada desde cero.
 
 **Enunciado:**
 
+La celda viene con las partes 5 y 6 (comparación cuantitativa y visual) **pre-resueltas** — son puro boilerplate de pandas y matplotlib que no agregan nada nuevo al pipeline. Vos te encargás de las partes 1 a 4, que es lo que tiene contenido conceptual:
+
 1. **Instalación de `segmentation_models_pytorch`.** En Colab no viene preinstalado: hay que correr `!pip install -q segmentation-models-pytorch`. La instalación toma unos segundos. Después importá la librería como `smp`.
 
-2. **Modelo: `smp.Unet` con encoder ResNet34 pre-entrenado.** Pasale `encoder_name="resnet34"`, `encoder_weights="imagenet"`, `in_channels=3` y `classes=NUM_CLASSES`. Mandalo al `device`. La estructura interna es la de una U-Net (encoder-decoder con skip connections) similar a la que implementaste — la diferencia clave es que el encoder es un ResNet-34 con pesos pre-entrenados, en lugar de una secuencia de `DownConvolution` con pesos al azar.
+2. **Modelo: `smp.Unet` con encoder ResNet34 pre-entrenado.** Pasale `encoder_name="resnet34"`, `encoder_weights="imagenet"`, `in_channels=3` y `classes=NUM_CLASSES`. Mandalo al `device` y guardalo en una variable llamada **`model_ft`** (las partes pre-resueltas la usan con ese nombre). La estructura interna es la de una U-Net (encoder-decoder con skip connections) similar a la que implementaste — la diferencia clave es que el encoder es un ResNet-34 con pesos pre-entrenados, en lugar de una secuencia de `DownConvolution` con pesos al azar.
 
-3. **Loss y optimizador.** Reutilizá los pesos por clase del Ej. 9 (no hay que recalcularlos: el dataset es el mismo). Mismas hiperparámetros: cross-entropy ponderada con `ignore_index=IGNORE_INDEX`, Adam con `lr=1e-3`.
+3. **Loss y optimizador.** Reutilizá los pesos por clase del Ej. 8 (no hay que recalcularlos: el dataset es el mismo). Mismas hiperparámetros: `nn.CrossEntropyLoss` ponderada con `ignore_index=IGNORE_INDEX`, `torch.optim.Adam` con `lr=1e-3`. Llamalos **`criterion_ft`** y **`optimizer_ft`**.
 
-4. **Loop de entrenamiento por 5 epochs.** Mismo patrón que el Ej. 9 (train + eval por epoch, accuracy de pixel sobre píxeles válidos). Imprimí una línea por epoch y guardá el `val_acc` de cada una en `val_acc_ft_history`.
+4. **Loop de entrenamiento por 5 epochs.** Mismo patrón que el Ej. 8 (train + eval por epoch, accuracy de pixel sobre píxeles válidos). Imprimí una línea por epoch y guardá el `val_acc` de cada una en `val_acc_ft_history`. Definí también `num_epochs_ft = 5` antes del loop — la parte 5 lo usa para iterar.
 
-5. **Comparación cuantitativa.** Mostrá una tabla con `epoch | val_acc desde cero | val_acc fine-tuning`. La columna desde cero termina en epoch 4 (después queda en blanco) y la fine-tuning va hasta epoch 5. Usá un `pd.DataFrame` para que salga prolijo.
-
-6. **Comparación visual.** Tomá las mismas 4 imágenes del split de test que usaste en el Ej. 10 (con `read_pet_images`) y armá una visualización en dos figuras de 2 filas cada una. Cada fila tiene cuatro columnas: imagen / predicción desde cero / predicción fine-tuning / ground truth. Reusá `label2image`, `add_seg_legend` y la lógica de centro-crop + normalización del Ej. 10.
-
-> **Pista — el modelo de smp y el tuyo reciben/devuelven exactamente lo mismo:** un tensor `(B, 3, 256, 256)` normalizado entra, un tensor `(B, NUM_CLASSES, 256, 256)` de logits sale. Eso significa que el loop de entrenamiento del Ej. 9 funciona casi tal cual, solo cambiando la línea de instanciación del modelo.
+> **Pista — el modelo de smp y el tuyo reciben/devuelven exactamente lo mismo:** un tensor `(B, 3, 256, 256)` normalizado entra, un tensor `(B, NUM_CLASSES, 256, 256)` de logits sale. Eso significa que el loop de entrenamiento del Ej. 8 funciona casi tal cual, solo cambiando los nombres de las variables (`model → model_ft`, `criterion → criterion_ft`, `optimizer → optimizer_ft`).
 >
 > **Nota — qué esperar:** con 5 epochs de fine-tuning sobre Pet, `val_acc` debería superar **0.90 ya en la primera epoch** y converger en torno a **0.93-0.96** en la última. Esa es la magnitud del salto: un encoder ImageNet le ahorra a la red años de entrenamiento sobre features visuales generales y le permite enfocarse exclusivamente en la tarea de segmentación.
 ::::
 
 
-::::cell{#ej11-code type=code role=student-code}
+::::cell{#ej10-code type=code role=student-code}
 ```python
 # ─── 1) Instalación de segmentation_models_pytorch ──────────────────────────
 # En Colab no viene preinstalado. Si ya lo tenés, este comando es no-op.
+# Después importá la librería como `smp`.
 
 # Tu código aquí
 
 # ─── 2) Modelo: smp.Unet con encoder ResNet34 pre-entrenado ────────────────
+# Guardalo en `model_ft`. Mandalo al device.
 
 # Tu código aquí
 
-# ─── 3) Loss y optimizador (reutilizamos los pesos por clase del Ej. 9) ────
+# ─── 3) Loss y optimizador (reutilizamos los pesos por clase del Ej. 8) ────
+# `criterion_ft` con weights y ignore_index, `optimizer_ft` con Adam lr=1e-3.
 
 # Tu código aquí
 
 # ─── 4) Loop de entrenamiento (5 epochs, guardando val_acc_ft_history) ─────
+# Definí num_epochs_ft = 5 y val_acc_ft_history = [] antes del loop.
+# Mismo patrón que el Ej. 8 cambiando model/criterion/optimizer por *_ft.
 
 # Tu código aquí
 
-# ─── 5) Comparación cuantitativa: tabla val_acc desde cero vs fine-tuning ──
+# ─── 5) Comparación cuantitativa: tabla val_acc desde cero vs FT (PRE-RESUELTO)
+# val_acc_history viene del Ej. 8 (4 valores). val_acc_ft_history acaba de
+# generarse (5 valores). Mostramos las 5 epochs lado a lado, dejando "—"
+# cuando el desde-cero ya terminó.
+rows = []
+for e in range(num_epochs_ft):
+    a_zc = f"{val_acc_history[e]:.4f}" if e < len(val_acc_history) else "—"
+    a_ft = f"{val_acc_ft_history[e]:.4f}"
+    rows.append({"epoch": e + 1,
+                 "val_acc desde cero":  a_zc,
+                 "val_acc fine-tuning": a_ft})
+print("\nComparación val_acc por epoch:")
+print(pd.DataFrame(rows).to_string(index=False))
 
-# Tu código aquí
+# ─── 6) Comparación visual: imagen / desde cero / fine-tuning / GT (PRE-RESUELTO)
+# Reusamos test_imgs/test_masks que ya leímos en el Ej. 9 (los volvemos a
+# leer por las dudas), label2image, trimap_to_index y la lógica de centro-crop
+# + normalización. La única diferencia con el Ej. 9 es que ahora dibujamos
+# 4 columnas (agregamos la del fine-tuning) y corremos los dos modelos.
+n = 4
+test_imgs, test_masks = read_pet_images(pet_dir, n, split='test')
+model.eval()
+model_ft.eval()
 
-# ─── 6) Comparación visual: imagen / desde cero / fine-tuning / GT ─────────
 
-# Tu código aquí
+def predict_compare(idx, ax_row):
+    """
+    Para la imagen idx-ésima del split de test, dibuja en ax_row (4 axes):
+    imagen, predicción desde cero, predicción fine-tuning, ground truth.
+    """
+    img_t = test_imgs[idx]
+    msk_t = test_masks[idx].squeeze(0)            # (1, H, W) → (H, W)
+    H, W = img_t.shape[1], img_t.shape[2]
+    if H < 256 or W < 256:
+        f = max(256 / H, 256 / W) * 1.1
+        img_t = transforms.functional.resize(
+            img_t, [int(H * f), int(W * f)], antialias=True)
+        msk_t = transforms.functional.resize(
+            msk_t.unsqueeze(0), [int(H * f), int(W * f)],
+            interpolation=transforms.InterpolationMode.NEAREST).squeeze(0)
+        H, W = img_t.shape[1], img_t.shape[2]
+
+    top  = (H - 256) // 2
+    left = (W - 256) // 2
+    img_crop  = transforms.functional.crop(img_t, top, left, 256, 256)
+    mask_crop = transforms.functional.crop(msk_t, top, left, 256, 256).long()
+    X = norm(img_crop.float() / 255).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        pred_zc = model(X).argmax(dim=1).squeeze(0)        # desde cero
+        pred_ft = model_ft(X).argmax(dim=1).squeeze(0)     # fine-tuning
+    gt_idx = trimap_to_index(mask_crop)
+
+    ax_row[0].imshow(img_crop.permute(1, 2, 0))
+    ax_row[0].set_title("Imagen"); ax_row[0].axis('off')
+    ax_row[1].imshow(label2image(pred_zc))
+    ax_row[1].set_title("Pred. desde cero"); ax_row[1].axis('off')
+    ax_row[2].imshow(label2image(pred_ft))
+    ax_row[2].set_title("Pred. fine-tuning"); ax_row[2].axis('off')
+    ax_row[3].imshow(label2image(gt_idx))
+    ax_row[3].set_title("Ground truth"); ax_row[3].axis('off')
+
+
+ROWS_PER_FIG = 2
+with torch.no_grad():
+    for fig_idx in range(0, n, ROWS_PER_FIG):
+        fig, axs = plt.subplots(ROWS_PER_FIG, 4,
+                                figsize=(16, 4 * ROWS_PER_FIG))
+        for r in range(ROWS_PER_FIG):
+            predict_compare(fig_idx + r, axs[r])
+        add_seg_legend(fig)
+        plt.tight_layout(rect=[0, 0, 1, 0.94])
+        plt.show()
 ```
 
 ```python solution
@@ -1582,7 +1824,7 @@ model_ft = smp.Unet(
 print(f"Parámetros del modelo fine-tuning: "
       f"{sum(p.numel() for p in model_ft.parameters()):,}")
 
-# ─── 3) Loss y optimizador (reutilizamos los pesos por clase del Ej. 9) ────
+# ─── 3) Loss y optimizador (reutilizamos los pesos por clase del Ej. 8) ────
 # El dataset es el mismo, así que las frecuencias por clase no cambiaron y
 # `weights` ya está calculado. Solo necesitamos un optimizer nuevo apuntando
 # a los parámetros de model_ft.
@@ -1635,7 +1877,7 @@ for epoch in range(num_epochs_ft):
           f"val_acc={val_acc:.4f}")
 
 # ─── 5) Comparación cuantitativa ────────────────────────────────────────────
-# val_acc_history viene del Ej. 9 (4 valores). val_acc_ft_history acaba de
+# val_acc_history viene del Ej. 8 (4 valores). val_acc_ft_history acaba de
 # generarse (5 valores). Mostramos las 5 epochs lado a lado, dejando "—"
 # cuando el desde-cero ya terminó.
 rows = []
@@ -1652,7 +1894,7 @@ print("\nComparación val_acc por epoch:")
 print(pd.DataFrame(rows).to_string(index=False))
 
 # ─── 6) Comparación visual: imagen / desde cero / fine-tuning / GT ─────────
-# Reusamos test_imgs/test_masks que ya leímos en el Ej. 10. Si por alguna
+# Reusamos test_imgs/test_masks que ya leímos en el Ej. 9. Si por alguna
 # razón el alumno no los tiene cargados, los volvemos a leer acá.
 n = 4
 test_imgs, test_masks = read_pet_images(pet_dir, n, split='test')
@@ -1717,14 +1959,14 @@ with torch.no_grad():
 ::::
 
 
-::::cell{#ej11-pregunta type=markdown role=pregunta}
+::::cell{#ej10-pregunta type=markdown role=pregunta}
 **Pregunta de análisis:**
 
 ¿Por qué el fine-tuning con un encoder pre-entrenado en ImageNet (un dataset de **clasificación** de 1000 clases como "perro labrador", "gato siamés", "auto", "edificio") transfiere tan bien a una tarea aparentemente distinta como **segmentación binaria de mascotas**? Pensá específicamente en qué está aprendiendo el encoder durante el pre-entrenamiento y por qué esos features son útiles también para decidir, píxel a píxel, si pertenece a una mascota o al fondo.
 ::::
 
 
-::::cell{#ej11-respuesta type=markdown role=student-answer}
+::::cell{#ej10-respuesta type=markdown role=student-answer}
 *(Escribí tu respuesta acá)*
 
 ```markdown solution
@@ -1755,11 +1997,11 @@ Revisá esta checklist rápida:
 
 - [ ] Reinicié el entorno y ejecuté **todas** las celdas de arriba a abajo sin errores (**Entorno de ejecución > Reiniciar y ejecutar todo**).
 - [ ] Los tests de `SimpleConvolution`, `DownConvolution`, `UpConvolution`, `LastConvolution`, `crop_img` y `UNet` pasan sin errores.
-- [ ] Los entrenamientos del Ej. 9 (prueba inicial, 4 epochs) y del Ej. 11 (fine-tuning, 5 epochs) corrieron sin OOM. Si tuve OOM, reinicié el entorno y volví a ejecutar.
-- [ ] La prueba inicial del Ej. 9 supera claramente el ~70% de "predecir todo fondo" (esperable: ~0.78-0.85). El fine-tuning del Ej. 11 lo supera con holgura (esperable: >0.90).
-- [ ] La grilla de visualización del Ej. 10 muestra al menos una imagen donde la silueta de la mascota es reconocible, aunque sea de forma rudimentaria.
-- [ ] La comparación visual del Ej. 11 muestra una mejora clara de la columna fine-tuning respecto a la columna desde cero.
-- [ ] Respondí las preguntas de análisis (Ej. 1, 2, 8, 9, 10, 11).
+- [ ] Los entrenamientos del Ej. 8 (prueba inicial, 4 epochs) y del Ej. 10 (fine-tuning, 5 epochs) corrieron sin OOM. Si tuve OOM, reinicié el entorno y volví a ejecutar.
+- [ ] La prueba inicial del Ej. 8 supera claramente el ~70% de "predecir todo fondo" (esperable: ~0.78-0.85). El fine-tuning del Ej. 10 lo supera con holgura (esperable: >0.90).
+- [ ] La grilla de visualización del Ej. 9 muestra al menos una imagen donde la silueta de la mascota es reconocible, aunque sea de forma rudimentaria.
+- [ ] La comparación visual del Ej. 10 muestra una mejora clara de la columna fine-tuning respecto a la columna desde cero.
+- [ ] Respondí las preguntas de análisis (Ej. 1, 7, 8, 9, 10).
 - [ ] No modifiqué ninguna celda fuera de las de actividad (ni las de test ni las de setup).
 ::::
 

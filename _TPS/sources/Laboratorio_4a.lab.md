@@ -34,7 +34,7 @@ Hasta ahora trabajamos con redes que **clasifican** una imagen entera (¿es un p
 1. **¿Qué es?** (clasificación)
 2. **¿Dónde está?** (localización, mediante una caja delimitadora o *bounding box*)
 
-### El gap entre teoría y práctica
+### La distancia entre teoría y práctica
 
 La teoría de detección moderna es densa: anchors, *region proposals*, *non-maximum suppression*, métricas como mAP e IoU, regresión de cajas con pérdidas tipo CIoU, arquitecturas como Faster R-CNN, RetinaNet, FCOS, YOLO, DETR, RT-DETR... Cubrir todo esto en profundidad consumiría varias clases. **En clase vimos los fundamentos conceptuales**; en este laboratorio vamos a **usar herramientas actuales** sin reimplementar internamente cómo funcionan.
 
@@ -49,6 +49,7 @@ Términos que vamos a usar repetidamente:
 - **NMS (Non-Maximum Suppression):** algoritmo de post-procesamiento que elimina cajas duplicadas. Si dos detecciones superpuestas refieren al mismo objeto (IoU alta), se queda con la de mayor confianza y descarta el resto.
 - **Confianza (confidence threshold):** un detector predice cientos de cajas con un score asociado; típicamente se filtran las que están por debajo de un umbral (ej. 0.25).
 - **mAP (mean Average Precision):** métrica estándar para comparar detectores. Combina precisión y recall a varios umbrales de IoU. Más alto es mejor; `mAP50` evalúa con IoU≥0.5, `mAP50-95` promedia varios IoU.
+- **Anchors:** cajas de referencia prefijadas que en arquitecturas viejas servían de base sobre la que el modelo predecía offsets (qué tan corrida y qué tan cambiada de tamaño está la caja real respecto del anchor). Las versiones modernas de YOLO (v8+) son **anchor-free**: predicen las cajas directamente desde cada posición del mapa de features, sin anchors prefijados.
 
 ### Panorama de detectores en 2026
 
@@ -56,7 +57,7 @@ En el campo conviven tres familias principales. Es importante saber qué hay por
 
 | Familia | Ejemplos | Fortaleza | Cuándo conviene |
 |---|---|---|---|
-| **YOLO** (one-stage) | YOLOv8, YOLOv11 (Ultralytics) | Velocidad, fine-tuning trivial, ecosistema maduro | Tiempo real, edge devices, proyectos donde "que ande rápido" importa más que el último 1% de mAP |
+| **YOLO** (one-stage) | YOLOv8, YOLOv11 (Ultralytics) | Velocidad, fine-tuning trivial, ecosistema maduro | Tiempo real, dispositivos embebidos, proyectos donde "que ande rápido" importa más que el último 1% de mAP |
 | **Transformer-based** | DETR, RT-DETR, DINO | Sin anchors, sin NMS, formulación más limpia | Cuando la flexibilidad del transformer aporta (relaciones entre objetos, escenas complejas) |
 | **Two-stage clásicos** | Faster R-CNN, Mask R-CNN (torchvision) | Estabilidad, transparencia pedagógica | Pipelines legacy, segmentación de instancias |
 
@@ -191,7 +192,7 @@ for split in ['train', 'val', 'test']:
 ---
 ## Sección A: Inferencia con YOLO preentrenado
 
-Antes de realizar fine-tuning, vamos a usar el modelo "tal cual viene" para detectar objetos en imágenes arbitrarias. Esto cumple dos roles: por un lado, ver lo impresionante que es un detector moderno preentrenado; por otro, familiarizarnos con la API de `ultralytics` que después usamos para entrenar.
+Antes de realizar fine-tuning, vamos a usar el modelo "tal cual viene" para detectar objetos en imágenes arbitrarias. Esto cumple dos roles: por un lado, ver el alcance de un detector moderno preentrenado; por otro, familiarizarnos con la API de `ultralytics` que después usamos para entrenar.
 ::::
 
 
@@ -243,12 +244,21 @@ Las versiones modernas (v8+) son **anchor-free**: predicen las cajas directament
 
 **Enunciado:**
 
-1. Cargá el modelo preentrenado `yolo11n.pt` (la variante nano de YOLOv11). La primera vez `ultralytics` descarga los pesos automáticamente.
-2. Corré inferencia sobre la imagen de ejemplo `https://ultralytics.com/images/bus.jpg`. El modelo acepta URLs directamente.
-3. Visualizá el resultado con las cajas dibujadas usando el método `.plot()` del objeto `Result`. Tené en cuenta que `.plot()` devuelve la imagen en formato BGR (orden de canales de OpenCV), así que si la mostrás con `matplotlib` hay que invertir los canales.
-4. Imprimí cada detección con su clase (nombre, no índice) y su nivel de confianza.
+1. **Instanciá el modelo preentrenado.** El constructor de `ultralytics` se llama `YOLO` (lo importamos en la celda de setup) y recibe el nombre del checkpoint como string: usá `'yolo11n.pt'`, la variante "nano" de YOLOv11. La primera vez que se ejecuta, `ultralytics` descarga los pesos automáticamente. Guardalo en una variable que vas a reutilizar después; por convención la llamamos `model`.
 
-> **Pista:** `model(...)` devuelve una lista de `Result` (una entrada por imagen procesada). Cada `Result` tiene `.boxes` (las detecciones), `.names` (diccionario `{índice: nombre}` de clases del modelo) y el método `.plot()`. Cada caja en `.boxes` tiene `.cls` (índice de clase) y `.conf` (confianza), ambos como tensores de un solo elemento.
+2. **Corré inferencia sobre la imagen de ejemplo `https://ultralytics.com/images/bus.jpg`.** El patrón idiomático de la API es llamar al modelo como si fuera una función, pasándole la entrada: `model(entrada)`. La entrada puede ser una URL como string, un path local, un array NumPy o un tensor. La llamada devuelve una **lista** de objetos `Result` (uno por imagen procesada). Como acá pasamos una sola imagen, te queda una lista de un elemento — quedate con el primero (`results[0]`).
+
+3. **Visualizá el resultado con las cajas dibujadas.** Cada `Result` tiene un método `.plot()` que devuelve la imagen renderizada con las cajas, etiquetas y confianzas ya dibujadas. Atención: `.plot()` devuelve la imagen en orden de canales **BGR** (el orden que usa OpenCV), pero `matplotlib.pyplot.imshow` espera **RGB**. Si los colores te salen raros, invertí el orden de canales antes de mostrarla — `img[:, :, ::-1]` da vuelta el último eje.
+
+4. **Imprimí cada detección con su clase (nombre, no índice) y su nivel de confianza.** El `Result` expone dos atributos útiles para esto:
+   - `.boxes`: lista iterable de cajas detectadas.
+   - `.names`: diccionario `{índice: nombre}` que traduce el índice numérico de clase devuelto por el modelo a su nombre legible.
+
+   Y cada caja dentro de `.boxes` tiene:
+   - `.cls`: índice de clase.
+   - `.conf`: nivel de confianza.
+
+   Ojo con un detalle: `.cls` y `.conf` no son números planos sino **tensores de un solo elemento**. Para usarlos como números hay que indexar el primer elemento y castear al tipo nativo (algo del estilo `int(box.cls[0])` o `float(box.conf[0])`).
 ::::
 
 
@@ -291,26 +301,6 @@ for box in res.boxes:
 ::::
 
 
-::::cell{#ej1-pregunta type=markdown role=pregunta}
-**Pregunta de análisis:**
-
-Mirá las clases que detectó el modelo. ¿Por qué no detecta "ventana", "rueda" o "espejo retrovisor", aunque claramente están en la imagen?
-::::
-
-
-::::cell{#ej1-respuesta type=markdown role=student-answer}
-*(Escribí tu respuesta acá)*
-
-```markdown solution
-**Respuesta a la pregunta de análisis:**
-
-El modelo está entrenado sobre **COCO**, que tiene exactamente 80 clases predefinidas (persona, auto, bus, bicicleta, semáforo, etc.). El modelo solo puede predecir clases que vio durante el entrenamiento: el conjunto de salidas posibles está fijado por la arquitectura de la cabeza de clasificación, que tiene 80 neuronas — una por clase.
-
-Una "ventana", una "rueda" o un "espejo" no están en ese vocabulario, así que aunque visualmente estén ahí, el modelo no las "ve" como categoría: no tiene una salida posible que las represente. Esta limitación es una propiedad fundamental de los detectores supervisados de vocabulario cerrado: si necesitamos detectar clases nuevas, hay que entrenar (o realizar fine-tuning) sobre datos que las contengan — exactamente lo que vamos a hacer en la próxima sección con BCCD.
-```
-::::
-
-
 <!-- ──────────────────────────────────────────────────────────────────────
      EJERCICIO 2 — Confianza e IoU del NMS
      ────────────────────────────────────────────────────────────────────── -->
@@ -322,16 +312,23 @@ Una "ventana", una "rueda" o un "espejo" no están en ese vocabulario, así que 
 
 **Enunciado:**
 
-1. Sobre la misma imagen `https://ultralytics.com/images/bus.jpg`, hacé dos inferencias variando el threshold de confianza:
-   - `conf=0.10` (laxo: deja pasar muchas cajas)
-   - `conf=0.70` (estricto: solo cajas muy seguras)
-   Mostrá las dos imágenes lado a lado y reportá cuántas detecciones hay en cada caso.
-2. Hacé lo mismo variando el threshold IoU del NMS, pero **bajando la confianza a `conf=0.05`** para que el modelo exponga muchas cajas candidatas (con la confianza por defecto, la mayoría de las cajas duplicadas ya se descartan antes de NMS y no se ve la diferencia):
-   - `iou=0.30` (estricto: descarta agresivamente cajas superpuestas)
-   - `iou=0.80` (laxo: solo descarta si las cajas casi se superponen totalmente)
+Reutilizá el `model` que ya instanciaste en el Ej. 1 — no hace falta volver a cargar los pesos.
+
+1. **Variá el threshold de confianza.** Sobre la misma imagen `https://ultralytics.com/images/bus.jpg`, hacé dos inferencias cambiando el argumento `conf`:
+   - `conf=0.10` (laxo: deja pasar muchas cajas).
+   - `conf=0.70` (estricto: solo cajas muy seguras).
+
+   Mostrá las dos imágenes lado a lado y, en el título de cada una, reportá la cantidad de detecciones (`len(res.boxes)` te da el conteo).
+
+2. **Variá el threshold IoU del NMS.** Hacé lo mismo, pero ahora bajando además la confianza a `conf=0.05` para forzar al modelo a exponer muchas cajas candidatas: con la confianza por defecto (0.25), la mayoría de las cajas duplicadas ya quedan descartadas antes de llegar a NMS, y entonces variar `iou` apenas se nota. Compará:
+   - `iou=0.30` (estricto: descarta agresivamente cajas superpuestas).
+   - `iou=0.80` (laxo: solo descarta si las cajas casi se superponen totalmente).
+
    Mostrá las dos imágenes lado a lado y reportá la cantidad de cajas en cada caso.
 
-> **Pista:** Tanto `conf` como `iou` se pasan como argumentos al llamar a `model(...)`. Por ejemplo: `model(img_url, conf=0.5, iou=0.5)`. Para visualizar dos imágenes lado a lado usá `plt.subplots(1, 2, figsize=(...))`.
+> **Pista 1:** Tanto `conf` como `iou` se pasan como argumentos kwargs en la llamada al modelo, junto con la entrada: `model(img_url, conf=0.5, iou=0.5)`. Pasá también `verbose=False` para que `ultralytics` no imprima el log completo de cada inferencia y la salida quede limpia.
+
+> **Pista 2:** Para mostrar dos imágenes lado a lado, `plt.subplots(1, 2, figsize=(16, 8))` te devuelve `(fig, axes)`. Después indexás cada eje (`axes[0]`, `axes[1]`) y le aplicás `.imshow(...)`, `.set_title(...)` y `.axis('off')`. No te olvides de invertir el orden de canales en cada `.plot()`, igual que en el Ej. 1.
 ::::
 
 
@@ -434,8 +431,7 @@ En detección la lógica es la misma, pero con un detalle adicional: la **cabeza
 
 Lo que se reinicializa:
 
-- La **cabeza de clasificación** dentro del head (de 80 clases a 3 en nuestro caso).
-- Los pesos asociados específicamente a las predicciones de clase.
+- La **cabeza de clasificación** dentro del head (los pesos que producen las probabilidades de clase pasan de 80 salidas a 3).
 
 Ultralytics maneja esto automáticamente cuando le pasás un dataset con un número de clases distinto al original. No hace falta tocar nada manualmente: lee el `data.yaml`, descubre el `nc`, reconstruye la cabeza y entrena end-to-end.
 ::::
@@ -452,11 +448,13 @@ Ultralytics maneja esto automáticamente cuando le pasás un dataset con un núm
 
 **Enunciado:**
 
-1. Tomá la primera imagen del split de **test** del dataset BCCD (`DATA_ROOT / 'images' / 'test'`).
-2. Corré inferencia sobre esa imagen con el modelo `yolo11n.pt` preentrenado en COCO (el mismo del Ej. 1).
-3. Visualizá el resultado con `.plot()` e imprimí las detecciones (clase + confianza). Bajá el threshold a `conf=0.05` para que aparezca todo lo que el modelo "cree ver".
+El patrón de inferencia es el mismo del Ej. 1, con dos diferencias: la imagen ahora es local (no una URL) y bajamos mucho el threshold para forzar al modelo a mostrar todo lo que "cree ver" sobre un dominio para el que no fue entrenado.
 
-> **Pista:** El path de la imagen de test podés obtenerlo con `sorted((DATA_ROOT / 'images' / 'test').iterdir())[0]`. Pasalo a `model(...)` como string (`str(...)`).
+1. **Conseguí el path de la primera imagen del split de test.** Las imágenes viven en `DATA_ROOT / 'images' / 'test'`. Listá el contenido del directorio con `.iterdir()` (devuelve un iterable de objetos `Path`), ordenalo con `sorted(...)` para que sea reproducible (`iterdir` no garantiza orden) y quedate con el primer elemento.
+
+2. **Corré inferencia con el modelo preentrenado en COCO.** Es el mismo `yolo11n.pt` del Ej. 1; instanciá una variable separada (por ejemplo, `model_coco`) para mantenerlo nominalmente distinto del `model` del Ej. 1 — más adelante, en Ej. 4, vamos a sobrescribir `model` con un fine-tuning. Pasale el path de la imagen como string (`str(path)`): algunos backends de `ultralytics` esperan str, no `Path`. Usá `conf=0.05` para que aparezca todo lo que el modelo "cree ver", y `verbose=False` para silenciar el log.
+
+3. **Visualizá el resultado e imprimí las detecciones** (clase + confianza), igual que en el Ej. 1 (mismo patrón con `.plot()` y la inversión BGR→RGB; mismo recorrido por `res.boxes`).
 ::::
 
 
@@ -526,18 +524,20 @@ Estas dos razones (granularidad de clases + domain gap) son exactamente lo que e
 
 **Enunciado:**
 
-1. Instanciá un modelo nuevo a partir de `yolo11n.pt` (no usar `model_coco` del ejercicio anterior por si quedaron cachés de inferencia con thresholds modificados).
-2. Llamá a `model.train(...)` con los siguientes argumentos:
-   - `data` = path al `data.yaml` que generamos en el setup (recordá que hay que pasarlo como string).
-   - `epochs=20`
-   - `imgsz=640` (tamaño al que se resizean las imágenes para entrenar)
-   - `batch=16`
-   - `name='bccd_finetune'` (nombre de la corrida; se guarda en `runs/detect/bccd_finetune/`)
-3. Esperá a que termine (~5-10 min en T4). Al final, los pesos del mejor checkpoint quedan en `runs/detect/bccd_finetune/weights/best.pt`.
+1. **Instanciá un modelo nuevo** a partir de `yolo11n.pt`, en una variable que llamamos `model` (sobreescribiendo la del Ej. 1, que ya no necesitamos). No reutilices `model_coco` del Ej. 3 por si quedaron cachés de inferencia con thresholds modificados — más limpio arrancar de cero.
 
-> **Pista:** Mientras entrena, ultralytics imprime una tabla por epoch con las pérdidas (box, cls, dfl) y métricas (mAP50, mAP50-95) sobre el split de validación. Es normal que las pérdidas oscilen un poco; lo importante es que el mAP50 vaya subiendo.
+2. **Llamá a `model.train(...)`** con los siguientes argumentos:
+   - `data=str(DATA_YAML)` — path al `data.yaml` generado en el setup. Va como string (no como `Path`).
+   - `epochs=20` — cantidad de pasadas completas sobre el set de entrenamiento. Suficiente para ver convergencia sin que el entrenamiento se vaya de tiempo en T4.
+   - `imgsz=640` — todas las imágenes se resizean a 640×640 antes de entrar al modelo.
+   - `batch=16` — cuántas imágenes procesa el modelo a la vez en cada paso de optimización.
+   - `name='bccd_finetune'` — nombre de la corrida. Ultralytics crea automáticamente la carpeta `runs/detect/<name>/` y guarda ahí logs, gráficos y checkpoints.
 
-> **Nota:** Si en algún momento querés re-entrenar desde cero, borrá la carpeta `runs/detect/bccd_finetune` antes (o cambiá el `name`).
+3. **Esperá a que termine** (~5-10 min en T4). Al final, los pesos del mejor checkpoint (según mAP50-95 en validación) quedan en `runs/detect/bccd_finetune/weights/best.pt` y los del último epoch en `last.pt`.
+
+> **Pista:** Mientras entrena, `ultralytics` imprime una tabla por epoch con las pérdidas (`box_loss`, `cls_loss`, `dfl_loss`) y métricas (`mAP50`, `mAP50-95`) sobre el split de validación. Es normal que las pérdidas oscilen un poco; lo importante es que el `mAP50` vaya subiendo.
+
+> **Nota:** Si en algún momento querés re-entrenar desde cero, borrá la carpeta `runs/detect/bccd_finetune` antes (o cambiá el `name` para no pisar la corrida anterior — `ultralytics` agrega un sufijo automáticamente si el nombre ya existe).
 ::::
 
 
@@ -579,18 +579,18 @@ results = model.train(
 
 **Enunciado:**
 
-1. Cargá el mejor checkpoint del fine-tuning desde `runs/detect/bccd_finetune/weights/best.pt`.
-2. Evaluá el modelo en el split de **test** con `best_model.val(data=..., split='test')`. Imprimí `mAP50` y `mAP50-95` globales y `mAP50` por clase (`metrics.box.maps` devuelve un array indexado por clase).
-3. Para las primeras 3 imágenes del split de test, hacé:
-   - Predicción con `best_model(...)` (usá `conf=0.25`, `verbose=False`).
-   - Conteo de detecciones por clase a partir de `res.boxes`.
-   - Conteo de cajas en el ground truth leyendo el archivo `.txt` de etiquetas correspondiente.
-   - Imprimí una tabla por imagen comparando predicción vs GT.
-   - Mostrá la imagen con las cajas predichas usando `.plot()`.
+1. **Cargá el mejor checkpoint del fine-tuning.** El constructor `YOLO(...)` no solo acepta nombres de modelos preentrenados (como en Ej. 1) sino también rutas locales a checkpoints `.pt`. Pasale `'runs/detect/bccd_finetune/weights/best.pt'` y guardalo en `best_model`.
 
-> **Pista 1:** El nombre del archivo de etiquetas es el mismo que el de la imagen pero con extensión `.txt` y ubicado en `labels/test/` en lugar de `images/test/`. Podés construirlo con `(DATA_ROOT / 'labels' / 'test' / sample_img.stem).with_suffix('.txt')`.
+2. **Evaluá el modelo en el split de test** con `best_model.val(data=str(DATA_YAML), split='test', verbose=False)`. La llamada devuelve un objeto que contiene todas las métricas calculadas. Imprimí:
+   - `mAP50` y `mAP50-95` **globales** — escalares accesibles como `metrics.box.map50` y `metrics.box.map`.
+   - `mAP50` y `mAP50-95` **por clase** — arrays accesibles como `metrics.box.ap50[i]` y `metrics.box.maps[i]`, indexados según el orden de `class_names`.
 
-> **Pista 2:** Cada línea del archivo de etiquetas YOLO tiene la forma `clase_idx x_centro y_centro ancho alto` (las últimas cuatro normalizadas). Para contar instancias por clase basta con leer el primer número de cada línea.
+3. **Para las primeras 3 imágenes del split de test**, comparar predicción vs ground truth:
+   - **Predicción:** corré `best_model(str(img_path), conf=0.25, verbose=False)` y quedate con el primer `Result`, igual que en el Ej. 1.
+   - **Conteo de la predicción por clase** a partir de `res.boxes`. Patrón útil: arrancar con un dict `{n: 0 for n in class_names}` y, por cada caja en `res.boxes`, sumar 1 a la entrada correspondiente (la clase en string sale de `class_names[int(box.cls[0])]`).
+   - **Conteo del ground truth por clase** leyendo el archivo `.txt` de etiquetas. El path se construye reemplazando subcarpeta y extensión: `(DATA_ROOT / 'labels' / 'test' / img_path.stem).with_suffix('.txt')`. Cada línea del archivo tiene la forma `clase_idx x_centro y_centro ancho alto` (las últimas cuatro normalizadas), así que para contar basta con leer el primer número de cada línea (`int(line.split()[0])`) y mapearlo al nombre de clase con `class_names`.
+   - **Imprimí una tabla por imagen** con tres columnas: clase, predicción, GT.
+   - **Mostrá la imagen** con las cajas predichas usando `.plot()` (mismo patrón BGR→RGB del Ej. 1).
 ::::
 
 
@@ -652,7 +652,7 @@ for img_path in test_imgs:
 ::::cell{#ej5-pregunta type=markdown role=pregunta}
 **Pregunta de análisis:**
 
-Mirá los `mAP50` por clase. ¿Hay alguna clase donde el modelo funciona claramente peor que en las otras? Proponé al menos dos razones plausibles y, para cada una, qué cambio harías en el pipeline (datos, hiperparámetros, modelo) para mitigarla.
+Mirá los `mAP50` por clase y ordenalas de peor a mejor. Para la clase con peor performance, proponé al menos dos razones plausibles y, para cada una, qué cambio harías en el pipeline (datos, hiperparámetros, modelo) para mitigarla.
 ::::
 
 
@@ -689,7 +689,7 @@ Revisá esta checklist rápida:
 - [ ] El fine-tuning corrió completo y el checkpoint quedó guardado en `runs/detect/bccd_finetune/weights/best.pt`.
 - [ ] Los `mAP50` por clase tienen valores razonables (no todos en 0.0 ni en 1.0).
 - [ ] Las visualizaciones muestran las cajas predichas con sus clases y confianzas.
-- [ ] Respondí las cuatro preguntas de análisis (Ej. 1, 2, 3, 5).
+- [ ] Respondí las tres preguntas de análisis (Ej. 2, 3, 5).
 - [ ] No modifiqué ninguna celda fuera de las de actividad.
 ::::
 
