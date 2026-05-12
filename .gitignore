@@ -10,6 +10,8 @@ _TPS/Laboratorios/
 
 # Datasets
 data/
+fifa_data/
+fifa.zip
 
 # Entornos virtuales
 .venv/

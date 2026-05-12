@@ -1,0 +1,211 @@
+# Rúbrica de corrección — Laboratorio 5b: Autoencoders Variacionales
+#
+# Contrato entre el .lab.md (fuente) y la app de corrección:
+#   - `ejercicios` lista todos los ejercicios en el orden en que aparecen en el notebook.
+#   - Cada entrada referencia las celdas por cell_id (estables, generados por lab_build.py).
+#   - `graded_outputs` indica qué tipo de output rendereamos en la UI (para que el docente
+#     decida visualmente) — la IA NO los mira, solo recibe el código y la respuesta de texto.
+#   - `rubric.expected` es un resumen muy corto de qué se espera. `common_errors` lista
+#     errores frecuentes que orientan a la IA a detectar patrones típicos.
+#
+# Ejercicios con múltiples partes (ej1, ej6) usan schema v2 con `items:` explícitos.
+# Los demás usan schema v1 plano.
+
+lab: 5b
+title: "Laboratorio n° 5. Parte B: Autoencoders Variacionales"
+notebook_enunciado: "_TPS/Laboratorios/Laboratorio_5b.ipynb"
+notebook_solucion:  "_TPS/Soluciones/Laboratorio_5b_Solucion.ipynb"
+
+ejercicios:
+  - id: ej1
+    titulo: "Bloques convolucionales del encoder y del decoder"
+    enunciado_cell: ej1-enunciado
+    items:
+      - kind: code
+        key: ej1-code-a
+        code_cell: ej1-code-a
+        graded_outputs: []
+        rubric:
+          expected: >
+            `DEC_block` hereda de `nn.Module`. En `__init__` instancia
+            `nn.Conv2d(in_channels, out_channels, kernel_size, stride=strides, padding=padding)`,
+            `nn.BatchNorm2d(out_channels)` y `nn.LeakyReLU(alpha)`. En `forward(X)` aplica
+            las tres en orden: conv → bn → activación.
+          common_errors:
+            - "Aplicar BatchNorm DESPUÉS de la activación (la convención canónica es conv → bn → act)."
+            - "Olvidar `super().__init__()` — al guardar submódulos `nn.Module` falla en silencio."
+            - "Cambiar el orden de los argumentos posicionales de `nn.Conv2d` (channels y kernel_size)."
+            - "Usar `nn.ReLU` en vez de `nn.LeakyReLU` — el bloque del encoder usa LeakyReLU."
+            - "No pasar `alpha` a `LeakyReLU` (queda con el default 0.01 en vez del 0.2 esperado)."
+      - kind: code
+        key: ej1-code-b
+        code_cell: ej1-code-b
+        graded_outputs: []
+        rubric:
+          expected: >
+            `AUG_block` hereda de `nn.Module`. En `__init__` instancia
+            `nn.ConvTranspose2d(in_channels, out_channels, ...)`, `nn.BatchNorm2d(out_channels)`
+            y `nn.ReLU()`. En `forward(X)` aplica las tres en orden: deconv → bn → activación.
+          common_errors:
+            - "Usar `nn.Conv2d` en vez de `nn.ConvTranspose2d` (no sube resolución)."
+            - "Usar `nn.LeakyReLU` en vez de `nn.ReLU` — el bloque del decoder usa ReLU."
+            - "Olvidar `super().__init__()`."
+            - "Aplicar BatchNorm después de la activación."
+
+  - id: ej2
+    titulo: "Encoder variacional"
+    enunciado_cell: ej2-enunciado
+    code_cell:      ej2-code
+    pregunta_cell:  ej2-pregunta
+    answer_cell:    ej2-respuesta
+    graded_outputs: []
+    rubric:
+      expected: >
+        Tronco `nn.Sequential` con cuatro `DEC_block` (3→32→64→128→256, espacial 64→4)
+        y `nn.Flatten()` final. Dos cabezas independientes `nn.Linear(256*4*4, latent_dims)`
+        (`fc_mu`, `fc_log_var`) SIN activación. En `forward`: pasar por tronco, calcular
+        `mu` y `log_var`, aplicar reparametrización (`std = torch.exp(0.5 * log_var)`,
+        `eps = torch.randn_like(std)`, `z = mu + eps * std`) y devolver la tupla
+        `(z, mu, log_var)`.
+      common_errors:
+        - "CRÍTICO: aplicar ReLU u otra activación sobre `log_var` — fuerza σ ≥ 1, KL no se minimiza, las muestras del prior salen ruidosas y la interpolación se rompe."
+        - "Compartir una sola `nn.Linear` para μ y log_var en vez de dos cabezas independientes."
+        - "Usar `torch.normal(mu, std)` para muestrear — bloquea el gradiente y la red no aprende."
+        - "Calcular `std` como `log_var.exp()` (eso es la varianza) en vez de `exp(0.5 * log_var)`."
+        - "Devolver la tupla en otro orden o con otros nombres — `train_vae` y `vae_loss` esperan exactamente `(x_hat, mu, log_var)` aguas abajo."
+        - "Olvidar `nn.Flatten()` al final del tronco — los lineales reciben un tensor 4D y rompen."
+        - "No agregar `super().__init__()` en la clase."
+        - "En la respuesta de análisis, no mencionar que la operación de muestreo no es diferenciable o no explicar por qué eso impide entrenar el encoder."
+
+  - id: ej3
+    titulo: "Decoder"
+    enunciado_cell: ej3-enunciado
+    code_cell:      ej3-code
+    pregunta_cell:  ej3-pregunta
+    answer_cell:    ej3-respuesta
+    graded_outputs: []
+    rubric:
+      expected: >
+        `self.fc = nn.Linear(latent_dims, 256*4*4)`. `self.deconvs = nn.Sequential(...)`
+        con tres `AUG_block` (256→128→64→32, espacial 4→32), seguidos de
+        `nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1)` y `nn.Sigmoid()`.
+        En `forward(z)`: aplicar `fc`, reshapear con `h.view(-1, 256, 4, 4)` y pasar por
+        `deconvs`.
+      common_errors:
+        - "Olvidar la `nn.Sigmoid()` final — la BCE recibe valores fuera de [0,1] y rompe."
+        - "Usar `nn.Tanh()` sin cambiar el rango de las imágenes a [-1,1] ni la pérdida — rompe la BCE."
+        - "Olvidar el `view(-1, 256, 4, 4)` — entra al primer AUG_block como tensor 2D y falla."
+        - "Hardcodear el batch size en el reshape (`view(batch_size, ...)`) en vez de usar `-1`."
+        - "Cantidad o canales de los `AUG_block` distintos a los pedidos (rompe la simetría con el encoder)."
+        - "Olvidar `super().__init__()`."
+        - "En la respuesta, no conectar el rango [0,1] de la sigmoide con la pérdida BCE."
+
+  - id: ej4
+    titulo: "Pérdida del VAE (reconstrucción + KL)"
+    enunciado_cell: ej4-enunciado
+    code_cell:      ej4-code
+    pregunta_cell:  ej4-pregunta
+    answer_cell:    ej4-respuesta
+    graded_outputs: []
+    rubric:
+      expected: >
+        `recon = F.binary_cross_entropy(x_hat, x, reduction='sum')` y
+        `kl = -0.5 * torch.sum(1 + log_var - log_var.exp() - mu.pow(2))`. Devolver
+        `recon + kl`.
+      common_errors:
+        - "Invertir el orden de los argumentos de la BCE (`binary_cross_entropy(x, x_hat)`) — la BCE no es simétrica y la pérdida queda mal definida."
+        - "Usar `reduction='mean'` en vez de `'sum'` — cambia el balance relativo entre los dos términos."
+        - "Olvidar el signo `-0.5` de la KL o cambiar algún signo dentro del paréntesis (rompe el entrenamiento)."
+        - "Confundir `log_var.exp()` con `log_var` (no exponenciar la varianza)."
+        - "Restar la KL en vez de sumarla, o devolver solo `recon` (sin KL — el modelo degenera a AE clásico)."
+        - "En la respuesta de análisis, no explicar qué pasa sin el término KL: el espacio latente queda con huecos y el muestreo del prior no produce imágenes coherentes."
+
+  - id: ej5
+    titulo: "Ensamblar y entrenar el VAE"
+    enunciado_cell: ej5-enunciado
+    code_cell:      ej5-code
+    graded_outputs: [text]
+    rubric:
+      expected: >
+        Clase `VariationalAutoencoder` con `self.encoder` y `self.decoder`. En `forward(x)`:
+        `z, mu, log_var = self.encoder(x)`, `x_hat = self.decoder(z)`, retorna
+        `(x_hat, mu, log_var)`. `latent_dims = 128`, `vae = VariationalAutoencoder(latent_dims).to(device)`,
+        `train_vae(vae, data_iter, epochs=30)`.
+      common_errors:
+        - "Devolver la tupla en orden equivocado (p.ej. `(x_hat, log_var, mu)`) — `vae_loss` desempaqueta y queda mal."
+        - "Devolver solo `x_hat` — `train_vae` no puede desempaquetar."
+        - "Olvidar `.to(device)` en el modelo — el `x.to(device)` del loop no le alcanza al modelo."
+        - "Usar `latent_dims` muy chico (p.ej. 4) o muy grande (p.ej. 1024) sin justificarlo."
+        - "Reentrenar `train_vae` muchas veces — no es error grave pero degrada el modelo si se acumulan epochs."
+
+  - id: ej6
+    titulo: "Reconstrucción y muestras del prior"
+    enunciado_cell: ej6-enunciado
+    items:
+      - kind: code
+        key: ej6-code-a
+        code_cell: ej6-code-a
+        graded_outputs: [image]
+        rubric:
+          expected: >
+            `vae.eval()`, dentro de `torch.no_grad()` tomar `next(iter(data_iter))`,
+            quedarse con las primeras 8 imágenes, mandarlas al device, hacer forward por
+            `vae(x_batch)` y mostrar con `mostrar_recon(x_batch.cpu(), x_hat.cpu(), titulos=...)`.
+          common_errors:
+            - "Olvidar `vae.eval()` — BatchNorm queda en modo train y un batch chico produce reconstrucciones erráticas."
+            - "Olvidar `torch.no_grad()` — no rompe el resultado pero usa memoria de más."
+            - "Pasar el batch entero (sin slicing a 8) al `mostrar_recon` — la grilla se ve apretada."
+            - "No mover `x_hat` a CPU antes de mostrar."
+      - kind: code
+        key: ej6-code-b
+        code_cell: ej6-code-b
+        graded_outputs: [image]
+        rubric:
+          expected: >
+            `vae.eval()`, `torch.no_grad()`, `z = torch.randn(8, latent_dims, device=device)`,
+            `samples = vae.decoder(z)`, `mostrar_grilla(samples.cpu(), num_rows=2, num_cols=4)`.
+          common_errors:
+            - "Pasar `z` por el VAE entero (`vae(z)`) en vez de solo por el decoder — falla porque el encoder espera una imagen."
+            - "Usar `torch.rand` (uniforme [0,1]) en vez de `torch.randn` (gaussiano) — el prior es N(0,I)."
+            - "Crear `z` en CPU sin `device=device` — falla al pasarlo por un decoder en GPU."
+            - "Cantidad incorrecta de muestras (no 8) o `num_rows × num_cols` que no coincide con el batch."
+      - kind: analysis
+        key: ej6-analisis
+        pregunta_cell: ej6-pregunta
+        answer_cell:   ej6-respuesta
+        rubric:
+          expected: >
+            Identificar que las reconstrucciones son más nítidas que las muestras del prior,
+            y explicar por qué: el decoder vio cada imagen específica durante el entrenamiento
+            (con z cerca de μ(x)), mientras que el prior cubre regiones del latente que no
+            son exactamente donde están concentradas las codificaciones reales (el agregado
+            de las posteriors no es exactamente el prior). Mencionar la borrosidad típica
+            de los VAEs por la pérdida píxel a píxel.
+          common_errors:
+            - "Decir que las muestras del prior son más nítidas (al revés)."
+            - "No conectar la diferencia con el rol de la KL ni con la cobertura del prior."
+            - "No explicar la borrosidad del prior — atribuir el resultado solo a 'falta de entrenamiento'."
+
+  - id: ej7
+    titulo: "Interpolación lineal entre dos jugadores"
+    enunciado_cell: ej7-enunciado
+    code_cell:      ej7-code
+    pregunta_cell:  ej7-pregunta
+    answer_cell:    ej7-respuesta
+    graded_outputs: [image]
+    rubric:
+      expected: >
+        Función `model_interp(model, idx1, idx2, size=10)` que pone el modelo en `eval()`,
+        toma `fifa[idx1]` y `fifa[idx2]`, las pasa al device con `unsqueeze(0)`, dentro de
+        `torch.no_grad()` codifica con `model.encoder(...)` quedándose con `mu` (no con
+        `z`), construye la trayectoria con `linear_interpolation(mu_1[0], mu_2[0], size)`
+        y decodifica con `model.decoder(z_traj)`. Visualización con `mostrar_interp(imgs,
+        fifa[idx1][0], fifa[idx2][0], fifa.names[idx1], fifa.names[idx2])` para
+        `idx1=0, idx2=1, size=6`.
+      common_errors:
+        - "CRÍTICO: usar `z` (con ruido de la reparametrización) en vez de `mu` para los extremos — la interpolación cambia en cada llamada y los extremos no coinciden con las imágenes originales."
+        - "Pasar `mu_1` (shape `(1, latent_dims)`) directo a `linear_interpolation` sin indexar `[0]` — falla por shape o broadcastea mal."
+        - "Decodificar punto por punto en un loop en vez de pasar el batch entero al decoder — funciona pero es ineficiente y pedagógicamente confuso."
+        - "Olvidar `model.eval()` — BatchNorm en modo train produce trayectorias erráticas."
+        - "Hardcodear las imágenes inicial y final del original (truco viejo) en vez de mostrar las decodificaciones de los extremos."
+        - "En la respuesta de análisis, no conectar la suavidad con la KL ni con la propiedad de continuidad del espacio latente."
