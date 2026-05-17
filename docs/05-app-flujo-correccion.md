@@ -189,8 +189,11 @@ Layout (`view_correccion`):
 
 ## Paso 6 — Generar el txt del grupo
 
-Desde la matriz, click en el botón `txt (N)` de la columna del grupo.
-La app:
+La app **regenera el `grupo_NN.txt` automáticamente** cuando todos
+los ítems del grupo están corregidos. No hace falta tocar nada: en
+cada render de la matriz, si el grupo está completo y el contenido
+en disco difiere del que produciría el estado actual de `feedback/`,
+el archivo se reescribe. La lógica de construcción:
 
 1. Recorre los ítems en orden.
 2. Para cada uno, lee el `feedback/<item_key>.md`.
@@ -202,18 +205,32 @@ La app:
 6. Junta todos los bloques con doble salto de línea.
 7. Escribe el resultado a `<workdir>/grupo_NN/grupo_NN.txt`.
 
-El badge del botón cambia de `txt (N)` a `txt (N) ✓` cuando el archivo
-existe en disco. Se puede sobrescribir clickeando de nuevo.
+El botón `txt (N)` de la matriz pasa a tener un solo rol: **copiar
+el contenido del txt al portapapeles** del sistema (vía `pbcopy` en
+macOS, `xclip` en Linux, `clip` en Windows). Cuando se hace click,
+toast confirma "grupo_NN.txt copiado al portapapeles". El badge ✓
+aparece cuando el archivo existe en disco.
 
-**Si el grupo está pendiente o todo en "sin observaciones"**, el txt
-queda vacío y el botón se deshabilita (no hace falta crear un archivo
-vacío). El score sigue computándose para el header de la columna.
+**Si quedan ítems pendientes**, el botón se deshabilita y no se
+genera ni se actualiza el txt — así no se filtra al portapapeles
+una devolución incompleta. El tooltip indica cuántos ítems faltan.
+**Si el grupo está completo pero todo es "sin observaciones"**, el
+txt queda vacío y el botón también se deshabilita (no hay nada que
+copiar). El score sigue computándose para el header de la columna.
 
 ## Paso 7 — Subir los txt a Moodle
 
 Cada `<workdir>/grupo_NN/grupo_NN.txt` tiene la devolución para ese
-grupo, listo para copy/paste. La app no se ocupa de Moodle (no tiene
-API ni credenciales) — el upload lo hace el docente a mano.
+grupo, listo para pegar en Moodle. En la práctica, el flujo es:
+
+1. Click en `txt (N) ✓` en la matriz → contenido copiado al
+   portapapeles.
+2. Cambiar al tab del browser con Moodle, pegar (Cmd+V) en la caja
+   de feedback del grupo, guardar.
+3. Volver a la app, siguiente grupo.
+
+La app no se ocupa de Moodle (no tiene API ni credenciales) — el
+upload lo hace el docente a mano.
 
 ## Re-correcciones
 
@@ -225,8 +242,12 @@ Si después de un primer pase el docente quiere ajustar:
   app auto-guarda.
 - **Volver a pendiente**: botón "Borrar" → elimina el `.md` (el
   draft `.md` no se borra; queda como referencia para regenerar).
-- **Cambiar el txt final**: re-clickear el botón `txt (N)` después de
-  los ajustes.
+  Al volver a pendiente, el `grupo_NN.txt` queda con el contenido
+  viejo (la auto-regeneración solo corre cuando el grupo está
+  completo) — al re-completar el grupo, el txt se actualiza solo
+  en el siguiente render.
+- **Re-copiar al portapapeles**: clickear el botón `txt (N) ✓` de
+  nuevo después de los ajustes.
 
 ## Errores comunes durante la corrección
 

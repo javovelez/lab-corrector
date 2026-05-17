@@ -46,6 +46,29 @@ def open_in_os(path: Path) -> bool:
         return False
 
 
+def copy_to_clipboard(text: str) -> bool:
+    """Copia texto al portapapeles del sistema. Devuelve True si funcionó.
+
+    Aprovecha que Streamlit corre local (la app es de escritorio): el
+    portapapeles del SO del docente es accesible vía CLI nativo del SO.
+    """
+    try:
+        if sys.platform == "darwin":
+            subprocess.run(["pbcopy"], input=text, text=True, check=True)
+        elif sys.platform.startswith("linux"):
+            subprocess.run(
+                ["xclip", "-selection", "clipboard"],
+                input=text, text=True, check=True,
+            )
+        elif sys.platform == "win32":
+            subprocess.run(["clip"], input=text, text=True, check=True)
+        else:
+            return False
+        return True
+    except Exception:
+        return False
+
+
 def _clean_path(raw: str) -> str:
     """Normaliza un path pegado: quita comillas externas y espacios."""
     s = (raw or "").strip()
@@ -200,6 +223,31 @@ st.markdown(
         -webkit-text-fill-color: #000 !important;
         font-weight: 600 !important;
         opacity: 1 !important;
+    }
+    /* Panel de navegación lateral de la vista corrección: fijo al
+       viewport, siempre visible. Se renderiza al toplevel del script;
+       `position: fixed` lo saca del flujo y lo ancla a la derecha. El
+       cuerpo principal recibe `padding-right` extra para no quedar
+       tapado por el panel. */
+    .st-key-sticky-nav-panel {
+        position: fixed;
+        top: 4rem;
+        right: 0.5rem;
+        width: 100px;
+        z-index: 100;
+        background: var(--default-backgroundColor, #ffffff);
+        padding: 8px 6px;
+        border: 1px solid #DDD6C5;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    /* Streamlit usa distintos nombres según versión: cubrimos los
+       más comunes para garantizar que el cuerpo no quede debajo del
+       panel fijo. */
+    [data-testid="stMain"] .block-container,
+    [data-testid="stMain"] [data-testid="stMainBlockContainer"],
+    [data-testid="stAppViewContainer"] .block-container {
+        padding-right: 125px !important;
     }
     </style>
     """,
@@ -852,19 +900,47 @@ def view_matriz(
         n_obs = count_observaciones(workdir=wd, items=items, grupo=g)
         txt = build_grupo_txt(workdir=wd, items=items, grupo=g)
         txt_path = wd / g / f"{g}.txt"
+
+        # Auto-escribir el txt cuando el grupo está completamente
+        # corregido. Así el archivo siempre refleja el estado actual
+        # sin tener que apretar el botón. El botón pasa a servir solo
+        # para COPIAR al portapapeles. Si hay pendientes, no se
+        # genera nada — el archivo viejo (si existía) queda igual.
+        if pct is not None and txt:
+            current_disk = (
+                txt_path.read_text(encoding="utf-8")
+                if txt_path.exists() else None
+            )
+            if current_disk != txt:
+                txt_path.write_text(txt, encoding="utf-8")
+
         already = txt_path.exists()
+        txt_disabled = (not txt) or (pct is None)
+        if pct is None:
+            txt_help = (
+                f"Faltan {pendientes} ítems por corregir en este grupo. "
+                "Cuando estén todos, el txt se genera solo y este botón "
+                "lo copia al portapapeles."
+            )
+        elif not txt:
+            txt_help = "No hay observaciones para copiar."
+        else:
+            txt_help = (
+                f"El txt ya está generado en {txt_path.relative_to(wd)}. "
+                "Click para copiar su contenido al portapapeles "
+                "(listo para pegar en Moodle)."
+            )
         if header_cols[i + 1].button(
             label=f"txt ({n_obs}){' ✓' if already else ''}",
             use_container_width=True,
             key=f"dl-{g}",
-            help=(
-                f"Escribir {txt_path.relative_to(wd)} en el workdir "
-                "(solo observaciones, listo para Moodle)."
-            ),
-            disabled=not txt,
+            help=txt_help,
+            disabled=txt_disabled,
         ):
-            txt_path.write_text(txt, encoding="utf-8")
-            st.toast(f"Escrito {txt_path}", icon="💾")
+            if copy_to_clipboard(txt):
+                st.toast(f"{txt_path.name} copiado al portapapeles", icon="📋")
+            else:
+                st.toast(f"No pude copiar {txt_path.name} al portapapeles", icon="⚠️")
             st.rerun()
 
     # Notebooks para el batch IA. Se cargan una vez y se reusan por fila.
@@ -1047,6 +1123,142 @@ def _run_batch_for_item(
         )
 
 
+# ─── Panel de navegación lateral (vista corrección) ──────────────────────────
+
+def _grupo_short(g: str) -> str:
+    """`grupo_05` → `g05` (etiqueta corta para la nav lateral)."""
+    return "g" + g.replace("grupo_", "")
+
+
+def _tipo_short(t: str) -> str:
+    """`código` → `c`, `análisis` → `a`."""
+    return "c" if t == "código" else "a"
+
+
+def _render_corr_nav_panel(
+    *,
+    items: list[dict],
+    grupos: list[str],
+    item_key: str,
+    grupo: str,
+    item_idx: int,
+    grupo_idx: int,
+    ai_ok: bool,
+    draft_content: str,
+    fb_path: Path,
+    level_key: str,
+    pending_key: str,
+    pending_level_key: str,
+    current_status: str,
+    current_level: str | None,
+) -> None:
+    """Panel lateral derecho, sticky, con la nav y atajos del corrector.
+
+    Pensado para meterse adentro de un `st.container(key="sticky-nav-panel")`
+    en la columna derecha de la vista corrección. Los botones y atajos
+    son réplicas compactas de los que aparecen en el cuerpo.
+    """
+    if st.button("← volver", key="side-back", use_container_width=True):
+        st.query_params.clear()
+        st.rerun()
+
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+    prev_grupo = grupos[grupo_idx - 1] if grupo_idx > 0 else None
+    next_grupo = grupos[grupo_idx + 1] if grupo_idx < len(grupos) - 1 else None
+    if st.button(
+        f"↑ {_grupo_short(prev_grupo)}" if prev_grupo else "↑",
+        disabled=(prev_grupo is None),
+        use_container_width=True,
+        key="side-prev-grupo",
+        help="Mismo ítem, grupo anterior",
+    ):
+        st.query_params.update({"view": "corr", "grupo": prev_grupo, "item": item_key})
+        st.rerun()
+    if st.button(
+        f"↓ {_grupo_short(next_grupo)}" if next_grupo else "↓",
+        disabled=(next_grupo is None),
+        use_container_width=True,
+        key="side-next-grupo",
+        help="Mismo ítem, grupo siguiente",
+    ):
+        st.query_params.update({"view": "corr", "grupo": next_grupo, "item": item_key})
+        st.rerun()
+
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+    prev_item = items[item_idx - 1] if item_idx > 0 else None
+    next_item = items[item_idx + 1] if item_idx < len(items) - 1 else None
+    if st.button(
+        f"← {prev_item['ej_id']}·{_tipo_short(prev_item['tipo'])}" if prev_item else "←",
+        disabled=(prev_item is None),
+        use_container_width=True,
+        key="side-prev-item",
+        help="Mismo grupo, ítem anterior",
+    ):
+        st.query_params.update({"view": "corr", "grupo": grupo, "item": prev_item["key"]})
+        st.rerun()
+    if st.button(
+        f"{next_item['ej_id']}·{_tipo_short(next_item['tipo'])} →" if next_item else "→",
+        disabled=(next_item is None),
+        use_container_width=True,
+        key="side-next-item",
+        help="Mismo grupo, ítem siguiente",
+    ):
+        st.query_params.update({"view": "corr", "grupo": grupo, "item": next_item["key"]})
+        st.rerun()
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+    # Indicador IA: ✓ si la IA considera que cumple la rúbrica, ✗ si
+    # generó un borrador con observación, — si todavía no se generó.
+    if ai_ok:
+        ia_marker = "<span style='color:#2E7D32;font-weight:700'>✓</span>"
+    elif draft_content:
+        ia_marker = "<span style='color:#C62828;font-weight:700'>✗</span>"
+    else:
+        ia_marker = "<span style='color:#888'>—</span>"
+    st.markdown(
+        f"<div style='text-align:center;font-size:13px'>IA: {ia_marker}</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+    # Atajo "sin obs." — replica el handler del botón "Marcar sin
+    # observaciones" del cuerpo (mismo guard: no permite pasar a sin obs
+    # si el puntaje actual es regular/mal). El color del botón lo aplica
+    # `view_correccion` con un `<style>` inyectado al toplevel (acá no
+    # alcanza la especificidad: el CSS base de la app pisa lo que se
+    # inyecte desde adentro del container sticky).
+    if st.button("sin obs.", key="side-sin-obs", use_container_width=True):
+        current_radio = st.session_state.get(level_key)
+        if current_radio in (LEVEL_REGULAR, LEVEL_MAL):
+            st.toast(
+                "El puntaje actual no es 'bien' — primero cambialo o "
+                "borralo si querés marcar sin observaciones.",
+                icon="⚠️",
+            )
+        else:
+            save_sin_observaciones(fb_path)
+            st.session_state[pending_key] = ""
+            st.session_state[pending_level_key] = LEVEL_BIEN
+            st.rerun()
+
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+    # "ir al fondo": link a un ancla `#fondo` que se renderea al final
+    # del cuerpo. Estilado como botón para que matchee visualmente con
+    # el resto del panel.
+    st.markdown(
+        "<a href='#fondo' style='display:block;padding:6px 10px;"
+        "background:#EFEAE0;border:1px solid #DDD6C5;border-radius:8px;"
+        "text-align:center;text-decoration:none;color:#2B2B2B;"
+        "font-size:14px'>↓ ir al fondo</a>",
+        unsafe_allow_html=True,
+    )
+
+
 # ─── Vista corrección ────────────────────────────────────────────────────────
 
 def view_correccion(
@@ -1082,8 +1294,76 @@ def view_correccion(
         return
     entrega_nb = load_notebook(entrega_path)
 
-    # Breadcrumb + volver
-    col_bc, col_grp, col_back = st.columns([3, 1, 1])
+    item_idx = items.index(item)
+    grupo_idx = grupos.index(grupo)
+
+    # Estado de feedback y borrador IA: se computa acá arriba porque la
+    # navegación lateral lo usa (indicador IA, color del atajo "sin obs.").
+    # Los keys de los widgets también se definen acá para que el handler
+    # de "sin obs." del panel lateral pueda leer/escribir session_state
+    # usando las mismas claves que el body.
+    fb_path = feedback_path(wd, grupo, item_key)
+    draft_p = draft_path(wd, grupo, item_key)
+    ai_ok, draft_content = read_draft(draft_p)
+    current_status, current_content, current_level = read_feedback(fb_path)
+    widget_key = f"obs-{item_key}-{grupo}"
+    pending_key = f"pending-{widget_key}"
+    level_key = f"level-{item_key}-{grupo}"
+    pending_level_key = f"pending-{level_key}"
+
+    # Color del botón "sin obs." del panel lateral según el estado guardado:
+    #   - azul si está marcado como sin observaciones (status OK = 1pt)
+    #   - rojo si hay observación guardada con puntaje (cualquier nivel)
+    #   - default (cream) si está pendiente o sin clasificar
+    # Inyectamos el `<style>` acá al toplevel (no adentro del panel) y
+    # con un selector que pisa el CSS base de los botones secondary
+    # (`[data-testid="stButton"] button[kind="secondary"]`).
+    sin_obs_bg = None
+    sin_obs_border = None
+    if current_status == STATUS_OK:
+        sin_obs_bg, sin_obs_border = "#90CAF9", "#64B5F6"
+    elif current_status == STATUS_OBS and current_level in (
+        LEVEL_BIEN, LEVEL_REGULAR, LEVEL_MAL
+    ):
+        sin_obs_bg, sin_obs_border = "#EF9A9A", "#E57373"
+    if sin_obs_bg:
+        st.markdown(
+            f"<style>"
+            f".st-key-side-sin-obs button[kind=\"secondary\"],"
+            f"[data-testid=\"stButton\"] .st-key-side-sin-obs button {{"
+            f" background-color:{sin_obs_bg} !important;"
+            f" border-color:{sin_obs_border} !important;"
+            f" color:#222 !important; }}"
+            f"</style>",
+            unsafe_allow_html=True,
+        )
+
+    # Panel de navegación: se renderiza al toplevel y el CSS
+    # (`.st-key-sticky-nav-panel`) lo ancla al viewport con
+    # `position: fixed`. El cuerpo recibe `padding-right` extra para
+    # que no quede debajo del panel.
+    with st.container(key="sticky-nav-panel"):
+        _render_corr_nav_panel(
+            items=items,
+            grupos=grupos,
+            item_key=item_key,
+            grupo=grupo,
+            item_idx=item_idx,
+            grupo_idx=grupo_idx,
+            ai_ok=ai_ok,
+            draft_content=draft_content,
+            fb_path=fb_path,
+            level_key=level_key,
+            pending_key=pending_key,
+            pending_level_key=pending_level_key,
+            current_status=current_status,
+            current_level=current_level,
+        )
+
+    # Header: solo el botón para abrir el notebook del grupo. La
+    # navegación entre grupos/ítems y el "volver" viven en el panel
+    # lateral derecho.
+    col_bc, col_grp = st.columns([4, 1])
     col_bc.markdown(
         f"**{rubrica.get('title') or 'Lab'}** &nbsp; · &nbsp; "
         f"**{item['ej_id']}** · {item['tipo']}"
@@ -1097,11 +1377,6 @@ def view_correccion(
     ):
         if not open_in_os(entrega_path):
             st.toast(f"No pude abrir {entrega_path}", icon="⚠️")
-    if col_back.button("← Volver a la matriz", use_container_width=True):
-        st.query_params.clear(); st.rerun()
-
-    item_idx = items.index(item)
-    grupo_idx = grupos.index(grupo)
 
     def render_nav(prefix: str) -> None:
         col_nav1, col_nav2, col_nav3, col_nav4 = st.columns(4)
@@ -1150,36 +1425,36 @@ def view_correccion(
         else:
             col_nav4.button("↓", disabled=True, use_container_width=True, key=f"{prefix}-next-grupo-dis")
 
-    render_nav("nav-top")
-
     st.divider()
+
+    # Enunciado/pregunta en ancho completo arriba — lo sacamos de la
+    # columna izquierda para que la celda de código de la solución y la
+    # de la entrega arranquen a la misma altura.
+    if item["tipo"] == "código":
+        st.markdown("#### Enunciado")
+        st.markdown(cell_source(find_cell(enunciado_nb, ej["enunciado_cell"])))
+    else:
+        st.markdown("#### Pregunta")
+        if item.get("pregunta_cell"):
+            st.markdown(cell_source(find_cell(enunciado_nb, item["pregunta_cell"])))
+        else:
+            # Ejercicios solo-análisis: la pregunta vive en el enunciado.
+            st.markdown(cell_source(find_cell(enunciado_nb, ej["enunciado_cell"])))
 
     col_ref, col_ent = st.columns(2)
 
     with col_ref:
-        st.markdown("#### Referencia")
         if item["tipo"] == "código":
-            enun_cell = find_cell(enunciado_nb, ej["enunciado_cell"])
-            st.markdown(cell_source(enun_cell))
-
             st.markdown("**Solución oficial (código):**")
             sol_cell = find_cell(solucion_nb, item["code_cell"])
             st.code(cell_source(sol_cell), language="python")
         else:
-            if item.get("pregunta_cell"):
-                preg_cell = find_cell(enunciado_nb, item["pregunta_cell"])
-                st.markdown(cell_source(preg_cell))
-            else:
-                # Ejercicios solo-análisis: la pregunta vive en el enunciado.
-                enun_cell = find_cell(enunciado_nb, ej["enunciado_cell"])
-                st.markdown(cell_source(enun_cell))
-
             st.markdown("**Solución oficial (análisis):**")
             sol_cell = find_cell(solucion_nb, item["answer_cell"])
             st.markdown(cell_source(sol_cell) or "_(no definida en el notebook de solución)_")
 
     with col_ent:
-        st.markdown(f"#### Entrega — {grupo}")
+        st.markdown(f"**Entrega — {grupo}:**")
         _render_entrega_panel(
             wd=wd,
             grupo=grupo,
@@ -1193,11 +1468,6 @@ def view_correccion(
 
     # Feedback
     st.markdown("### Feedback")
-
-    fb_path = feedback_path(wd, grupo, item_key)
-    current_status, current_content, current_level = read_feedback(fb_path)
-    draft_p = draft_path(wd, grupo, item_key)
-    ai_ok, draft_content = read_draft(draft_p)
 
     if current_status == STATUS_PENDIENTE:
         status_text, status_bg = "pendiente", COLOR_PENDIENTE
@@ -1225,8 +1495,8 @@ def view_correccion(
     # El textarea es siempre la observación validada (o vacío si pendiente).
     # El borrador IA se muestra como referencia en una sección aparte abajo;
     # nunca pisa lo que el corrector ya guardó.
-    widget_key = f"obs-{item_key}-{grupo}"
-    pending_key = f"pending-{widget_key}"
+    # `widget_key` y `pending_key` se definen al principio de la función para
+    # que el sidebar también pueda usarlos.
 
     # Streamlit no permite modificar `session_state[widget_key]` después de
     # que el widget se instanció en el run actual. Para empujar texto al
@@ -1261,8 +1531,8 @@ def view_correccion(
     #   pre-seleccionamos `bien` para que si el corrector agrega un comentario
     #   no tenga que volver a clickear el puntaje.
     # En el resto (pendiente, obs legacy sin nivel) queda sin selección.
-    level_key = f"level-{item_key}-{grupo}"
-    pending_level_key = f"pending-{level_key}"
+    # `level_key` y `pending_level_key` se definen al principio de la función
+    # para que el sidebar también pueda usarlos.
     level_options = [LEVEL_BIEN, LEVEL_REGULAR, LEVEL_MAL]
     level_labels = {
         LEVEL_BIEN:    "bien (1pt)",
@@ -1487,6 +1757,9 @@ def view_correccion(
     ):
         st.query_params.clear()
         st.rerun()
+
+    # Ancla para el botón "ir al fondo" del panel lateral derecho.
+    st.markdown("<div id='fondo'></div>", unsafe_allow_html=True)
 
 
 # ─── Dispatch ────────────────────────────────────────────────────────────────

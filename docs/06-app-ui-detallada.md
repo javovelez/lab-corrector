@@ -108,8 +108,18 @@ Detalles importantes:
 - **Entrega faltante**: si un grupo no tiene `.ipynb` (porque el
   alumno no entregó), la columna entera se pinta roja y todos los
   ítems cuentan como 0pt. Score 0%.
-- **Botón `txt (N) ✓`**: el badge ✓ aparece si el archivo
-  `grupo_NN.txt` ya existe en disco. Re-clickear sobrescribe.
+- **Botón `txt (N) ✓`**: con doble comportamiento según el estado
+  del grupo:
+  - **Hay ítems pendientes** → botón deshabilitado. El archivo
+    `grupo_NN.txt` no se genera ni se actualiza. Tooltip indica
+    cuántos faltan.
+  - **Todos los ítems corregidos** → el `grupo_NN.txt` se
+    **regenera solo** en cada render de la matriz si el contenido
+    en disco difiere del que produciría el estado actual de
+    `feedback/`. El botón queda habilitado y al clickearlo **copia
+    el contenido al portapapeles** del SO (vía `pbcopy`/`xclip`/
+    `clip` según plataforma) para pegarlo en Moodle. El badge ✓
+    aparece cuando el archivo ya existe en disco.
 - **Botón "IA" por fila**: ejecuta el batch IA contra los grupos
   pendientes de esa fila. Saltea los que ya tienen feedback validado.
   Cuando ya hay al menos un borrador en la fila, el botón pasa de
@@ -135,33 +145,38 @@ ambos derivan de `read_feedback`.
 
 ## Vista corrección
 
-Layout en `view_correccion()`:
+Layout en `view_correccion()`. El header de la vista solo tiene el
+breadcrumb y el botón para abrir el `.ipynb`; toda la navegación
+vive en el [panel lateral fijo](#panel-lateral-fijo) a la derecha.
+El enunciado/pregunta se renderiza en ancho completo arriba y debajo
+quedan dos columnas alineadas con la solución oficial y la entrega
+del grupo.
 
 ```
-Lab 2 2026 · ej3 · código          [grupo_05] [← Volver]
-
-[← prev item] [next item →] [↑ prev grupo] [↓ next grupo]
-
-────────────────────────────────────────────────────────
-│ Referencia                  │ Entrega — grupo_05      │
-│                             │ Mostrando: ej3-code     │
-│ ### Ejercicio 3 — Sobel     │ (3/12) [↑] [↓] [Usar]   │
-│ ...                         │                         │
-│                             │ ```python               │
-│ Solución oficial (código):  │ def corr2d(X, K): ...   │
-│ ```python                   │ ```                     │
-│ def corr2d(X, K): ...       │ Outputs: ...            │
-│ ```                         │                         │
-────────────────────────────────────────────────────────
-
+Lab 2 2026 · ej3 · código                  [grupo_05]      ┌─────────┐
+                                                            │ ← volv. │
+#### Enunciado                                              │         │
+### Ejercicio 3 — Sobel                                     │ ↑ g04   │
+... (texto del enunciado, ancho completo) ...               │ ↓ g06   │
+                                                            │         │
+─────────────────────────────────────────                   │ ← ej3·a │
+│ Solución oficial (código):  │ Entrega — grupo_05:       │ │ ej4·c → │
+│ ```python                   │ Mostrando: ej3-code       │ │         │
+│ def corr2d(X, K): ...       │ (3/12) [↑] [↓] [Usar]     │ │ IA: ✓   │
+│ ```                         │ ```python                 │ │         │
+│                             │ def corr2d(X, K): ...     │ │ sin obs.│
+│                             │ ```                       │ │         │
+│                             │ Outputs: ...              │ │ ↓ fondo │
+─────────────────────────────────────────                   └─────────┘
+                                                          (fijo al viewport)
 ### Feedback
 Estado actual: [con observación · regular]
 
 [textarea de observación............................]
-                                                    │
-○ bien (1pt)  ⊙ regular (½pt)  ○ mal (0pt)         │
-                                                    │
-[Trasladar borrador] [Guardar] [Marcar sin obs] [✕] │
+
+○ bien (1pt)  ⊙ regular (½pt)  ○ mal (0pt)
+
+[Trasladar borrador] [Guardar] [Marcar sin obs] [✕]
 
 ────────────────────────────────────────────────────
 **Borrador IA**
@@ -172,6 +187,32 @@ Estado actual: [con observación · regular]
 [← prev item] [next item →] [↑ prev grupo] [↓ next grupo]
 [← Volver a la matriz]
 ```
+
+### Panel lateral fijo
+
+Vive en la esquina superior derecha del viewport. Usa
+`position: fixed` (CSS `.st-key-sticky-nav-panel`) para mantenerse
+visible **sin importar el scroll** — fue elegido sobre
+`position: sticky` porque los containers de columnas de Streamlit
+tienen `overflow` que rompe sticky. El cuerpo recibe `padding-right`
+extra para no quedar tapado.
+
+Contenido (de arriba a abajo, en columna):
+
+| Control | Qué hace |
+|---|---|
+| `← volver` | Vuelve a la vista matriz (`st.query_params.clear()`). |
+| `↑ gNN` / `↓ gNN` | Cambia al grupo prev/next, manteniendo el mismo ítem. `gNN` = `grupo_NN` abreviado. |
+| `← ejN·c` / `ejN·a →` | Cambia al ítem prev/next, manteniendo el mismo grupo. `c` = código, `a` = análisis. |
+| `IA: ✓ / ✗ / —` | Indicador del estado del borrador IA del ítem actual: ✓ (verde) cumple la rúbrica según la IA, ✗ (rojo) la IA dejó un borrador con observación, — (gris) todavía no se generó borrador. |
+| `sin obs.` | Atajo al "Marcar sin observaciones" del cuerpo. El color del botón refleja el estado guardado: **azul** (`#90CAF9`) si está marcado como sin observaciones, **rojo** (`#EF9A9A`) si tiene observación con puntaje guardado, **cream** (default) si está pendiente o sin clasificar. Mantiene el guard del cuerpo: si el puntaje actual es regular/mal, no permite pasar a "sin obs" y tira toast. |
+| `↓ ir al fondo` | Link a un ancla `<div id="fondo">` que se renderiza al final del cuerpo. Útil para saltar al `← Volver a la matriz` o al "Regenerar borrador IA" sin scrollear a mano. |
+
+El handler de `sin obs.` lee `session_state[level_key]` para el
+guard, y escribe `session_state[pending_key]` y
+`session_state[pending_level_key]` para que el render siguiente
+actualice el textarea y el radio del cuerpo. Esto comparte código
+con el botón "Marcar sin observaciones" — los keys son los mismos.
 
 ### Navegador de celdas (mini-controles `↑ ↓`)
 
@@ -300,6 +341,27 @@ para tonarlos a `#EFEAE0` (secondary) y `#F2EFE7` (tertiary). Las
 filas con botón "IA ✓" usan `.st-key-batch-ia-<row>` para pintarlo
 verde — este selector apunta a la clase que Streamlit ≥1.36 agrega
 al contenedor del widget según su `key=`.
+
+El botón `sin obs.` del panel lateral usa el mismo mecanismo
+(`.st-key-side-sin-obs`) pero el `<style>` se inyecta dinámicamente
+desde `view_correccion()` al toplevel — **no** desde dentro del
+container del panel, porque el container fijo no propaga estilos
+con la especificidad necesaria para ganarle al CSS base de los
+botones secondary. Selector usado:
+`.st-key-side-sin-obs button[kind="secondary"]` (specificity
+empata con el CSS base; gana por orden de carga).
+
+### Copia al portapapeles
+
+`copy_to_clipboard(text)` (en `main.py`) corre `pbcopy` en macOS,
+`xclip -selection clipboard` en Linux y `clip` en Windows.
+Funciona porque la app es local: el subprocess accede al
+portapapeles del SO del docente. Mismo caveat que `open_in_os`: si
+la app se moviera a un servidor remoto, esto deja de funcionar.
+
+Se usa en la matriz para el botón `txt (N)`: cuando el grupo está
+completamente corregido, click copia el contenido del
+`grupo_NN.txt` al portapapeles.
 
 ### Open en SO
 
