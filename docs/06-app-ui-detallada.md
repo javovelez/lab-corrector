@@ -146,29 +146,32 @@ ambos derivan de `read_feedback`.
 ## Vista corrección
 
 Layout en `view_correccion()`. El header de la vista solo tiene el
-breadcrumb y el botón para abrir el `.ipynb`; toda la navegación
-vive en el [panel lateral fijo](#panel-lateral-fijo) a la derecha.
-El enunciado/pregunta se renderiza en ancho completo arriba y debajo
+breadcrumb y el botón `Notebook Grupo NN` (abre el `.ipynb` del
+grupo con la app por defecto del SO); toda la navegación vive en el
+[panel lateral fijo](#panel-lateral-fijo) a la derecha. El
+enunciado/pregunta se renderiza en ancho completo arriba y debajo
 quedan dos columnas alineadas con la solución oficial y la entrega
-del grupo.
+del grupo. Cada uno de los tres bloques (enunciado, solución,
+entrega) va en un `st.container(border=True)` para que se
+distingan visualmente.
 
 ```
-Lab 2 2026 · ej3 · código                  [grupo_05]      ┌─────────┐
+Lab 2 2026 · ej3 · código          [Notebook Grupo 05]     ┌─────────┐
                                                             │ ← volv. │
-#### Enunciado                                              │         │
-### Ejercicio 3 — Sobel                                     │ ↑ g04   │
-... (texto del enunciado, ancho completo) ...               │ ↓ g06   │
-                                                            │         │
-─────────────────────────────────────────                   │ ← ej3·a │
-│ Solución oficial (código):  │ Entrega — grupo_05:       │ │ ej4·c → │
-│ ```python                   │ Mostrando: ej3-code       │ │         │
-│ def corr2d(X, K): ...       │ (3/12) [↑] [↓] [Usar]     │ │ IA: ✓   │
-│ ```                         │ ```python                 │ │         │
-│                             │ def corr2d(X, K): ...     │ │ sin obs.│
-│                             │ ```                       │ │         │
-│                             │ Outputs: ...              │ │ ↓ fondo │
-─────────────────────────────────────────                   └─────────┘
-                                                          (fijo al viewport)
+┌─────────────────────────────────────────┐                 │         │
+│ #### Enunciado                          │                 │ ↑ g04   │
+│ ### Ejercicio 3 — Sobel                 │                 │ ↓ g06   │
+│ ... (texto del enunciado) ...           │                 │         │
+└─────────────────────────────────────────┘                 │ ← ej3·a │
+┌─────────────────────────┐ ┌───────────────────────────┐   │ ej4·c → │
+│ Solución oficial (cód): │ │ Entrega — grupo_05:       │   │         │
+│ ```python               │ │ Mostrando: ej3-code       │   │ IA: ✓   │
+│ def corr2d(X, K): ...   │ │ (3/12) [↑] [↓] [Usar]     │   │         │
+│ ```                     │ │ ```python                 │   │ sin obs.│
+│                         │ │ def corr2d(X, K): ...     │   │         │
+│                         │ │ ```                       │   │ ↓ fondo │
+│                         │ │ Outputs: ...              │   └─────────┘
+└─────────────────────────┘ └───────────────────────────┘  (fijo al viewport)
 ### Feedback
 Estado actual: [con observación · regular]
 

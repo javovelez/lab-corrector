@@ -1369,7 +1369,7 @@ def view_correccion(
         f"**{item['ej_id']}** · {item['tipo']}"
     )
     if col_grp.button(
-        grupo,
+        f"Notebook Grupo {grupo.replace('grupo_', '')}",
         key="bc-open-grupo",
         use_container_width=True,
         type="tertiary",
@@ -1429,40 +1429,45 @@ def view_correccion(
 
     # Enunciado/pregunta en ancho completo arriba — lo sacamos de la
     # columna izquierda para que la celda de código de la solución y la
-    # de la entrega arranquen a la misma altura.
-    if item["tipo"] == "código":
-        st.markdown("#### Enunciado")
-        st.markdown(cell_source(find_cell(enunciado_nb, ej["enunciado_cell"])))
-    else:
-        st.markdown("#### Pregunta")
-        if item.get("pregunta_cell"):
-            st.markdown(cell_source(find_cell(enunciado_nb, item["pregunta_cell"])))
-        else:
-            # Ejercicios solo-análisis: la pregunta vive en el enunciado.
+    # de la entrega arranquen a la misma altura. Cada bloque (enunciado,
+    # solución, entrega) va en su propio container con borde para que se
+    # distingan visualmente.
+    with st.container(border=True):
+        if item["tipo"] == "código":
+            st.markdown("#### Enunciado")
             st.markdown(cell_source(find_cell(enunciado_nb, ej["enunciado_cell"])))
+        else:
+            st.markdown("#### Pregunta")
+            if item.get("pregunta_cell"):
+                st.markdown(cell_source(find_cell(enunciado_nb, item["pregunta_cell"])))
+            else:
+                # Ejercicios solo-análisis: la pregunta vive en el enunciado.
+                st.markdown(cell_source(find_cell(enunciado_nb, ej["enunciado_cell"])))
 
     col_ref, col_ent = st.columns(2)
 
     with col_ref:
-        if item["tipo"] == "código":
-            st.markdown("**Solución oficial (código):**")
-            sol_cell = find_cell(solucion_nb, item["code_cell"])
-            st.code(cell_source(sol_cell), language="python")
-        else:
-            st.markdown("**Solución oficial (análisis):**")
-            sol_cell = find_cell(solucion_nb, item["answer_cell"])
-            st.markdown(cell_source(sol_cell) or "_(no definida en el notebook de solución)_")
+        with st.container(border=True):
+            if item["tipo"] == "código":
+                st.markdown("**Solución oficial (código):**")
+                sol_cell = find_cell(solucion_nb, item["code_cell"])
+                st.code(cell_source(sol_cell), language="python")
+            else:
+                st.markdown("**Solución oficial (análisis):**")
+                sol_cell = find_cell(solucion_nb, item["answer_cell"])
+                st.markdown(cell_source(sol_cell) or "_(no definida en el notebook de solución)_")
 
     with col_ent:
-        st.markdown(f"**Entrega — {grupo}:**")
-        _render_entrega_panel(
-            wd=wd,
-            grupo=grupo,
-            item=item,
-            item_key=item_key,
-            entrega_nb=entrega_nb,
-            enunciado_nb=enunciado_nb,
-        )
+        with st.container(border=True):
+            st.markdown(f"**Entrega — {grupo}:**")
+            _render_entrega_panel(
+                wd=wd,
+                grupo=grupo,
+                item=item,
+                item_key=item_key,
+                entrega_nb=entrega_nb,
+                enunciado_nb=enunciado_nb,
+            )
 
     st.divider()
 
