@@ -198,7 +198,7 @@ class MarioLevelDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         segment = self.segments[idx]
         # Flip horizontal aleatorio (data augmentation). El mapeo de tubos
-        # garantiza que un `<...>` flippeado sigue siendo un tubo válido.
+        # garantiza que un `<...>` reflejado sigue siendo un tubo válido.
         if self.use_flip and torch.rand(()).item() < 0.5:
             segment = flip_segment_horizontal(segment)
         arr = [[char2idx.get(ch, char2idx["-"]) for ch in row] for row in segment]
@@ -385,7 +385,7 @@ mostrar_vocabulario(sprites, vocab["char_descriptions"])
 
 31 niveles son demasiado pocos ejemplos para entrenar una GAN. En lugar de entrenar sobre niveles enteros, tomamos **ventanas horizontales** de 14 filas por 32 columnas, recorriendo cada nivel con paso de 8 columnas (75% de solape entre ventana y ventana). Además aplicamos **flip horizontal aleatorio** como *data augmentation*: cada vez que el dataset entrega un segmento, lo refleja con probabilidad ½. De esta forma, de los 31 niveles salen cientos de segmentos distintos, cada uno disponible además en su versión reflejada. La GAN va a aprender a generar segmentos de tamaño 14×32 — no niveles enteros.
 
-> **Flip con preservación de semántica.** El flip no es un simple espejo de la grilla: los tubos tienen lados (`<`/`>` para los costados, `[`/`]` para los topes). Al reflejar un segmento esos lados se tienen que **permutar**, para que un tubo flippeado siga siendo un tubo válido (con la curvatura del frente apuntando hacia el lado correcto). El helper `flip_segment_horizontal` se ocupa de hacer ese mapeo además del espejo.
+> **Flip con preservación de semántica.** El flip no es un simple espejo de la grilla: los tubos tienen lados (`<`/`>` para los costados, `[`/`]` para los topes). Al reflejar un segmento esos lados se tienen que **permutar**, para que un tubo reflejado siga siendo un tubo válido (con la curvatura del frente apuntando hacia el lado correcto). El helper `flip_segment_horizontal` se ocupa de hacer ese mapeo además del espejo.
 ::::
 
 
@@ -414,12 +414,12 @@ Para alinear el rango de los datos reales con la `tanh()` que usa el generador, 
 
 **Enunciado:**
 
-**Parte A — Visualizar segmentos reales.**
+**Parte A — Visualizar segmentos reales** _(primera celda de código de abajo)_.
 
-1. Tomá los **primeros 4 segmentos** del `dataset` (`dataset[0]`, `dataset[1]`, `dataset[2]`, `dataset[3]`).
-2. Mostralos en una columna usando `mostrar_segmentos(lista, sprites)`.
+1. Armá una **lista** con los **primeros 4 segmentos** del `dataset` (`dataset[0]`, `dataset[1]`, `dataset[2]`, `dataset[3]`).
+2. Mostrala en una columna usando `mostrar_segmentos(lista, sprites)`.
 
-**Parte B — Mirar un canal del tensor multicanal.**
+**Parte B — Mirar un canal del tensor multicanal** _(segunda celda de código de abajo)_.
 
 1. Tomá el segmento `dataset[0]` (un tensor de forma `(13, 14, 32)`).
 2. Quedate con **un solo canal**: el correspondiente al caracter `"X"` (bloques sólidos). Acordate que el índice del caracter está en `char2idx`.
@@ -470,7 +470,7 @@ print(canal_X)
 El dataset tiene **31 niveles** completos, pero el `len(dataset)` da varios cientos de segmentos. Mirá cómo construye `MarioLevelDataset` los segmentos: itera sobre cada nivel y toma ventanas de ancho 32 con paso 8, y a la entrega aplica un flip horizontal aleatorio.
 
 1. ¿Por qué se eligió un paso (`step=8`) menor que el ancho del segmento (`32`)? ¿Qué ganaríamos y qué perderíamos si usáramos `step=32` (sin solape)?
-2. El flip horizontal **mapea** los caracteres `<` ↔ `>` y `[` ↔ `]` en lugar de simplemente invertir el orden de la fila. ¿Por qué hace falta ese mapeo? ¿Qué pasaría visualmente si flipparamos sin él?
+2. El flip horizontal **mapea** los caracteres `<` ↔ `>` y `[` ↔ `]` en lugar de simplemente invertir el orden de la fila. ¿Por qué hace falta ese mapeo? ¿Qué pasaría visualmente si aplicáramos el flip sin él?
 3. Sabiendo que el dataset es chico y que la GAN va a entrenar sobre estos cientos de segmentos solapados, ¿qué riesgo concreto te imaginás que tiene el modelo en términos de **memorización** vs. **generación de niveles novedosos**?
 ::::
 
@@ -485,7 +485,7 @@ El dataset tiene **31 niveles** completos, pero el `len(dataset)` da varios cien
    Tomar ventanas con solape **multiplica los ejemplos efectivos**: el mismo tramo de nivel aparece centrado en distintas posiciones dentro de la ventana, así que la GAN ve la misma estructura desplazada y aprende a generarla en cualquier posición horizontal del segmento. Con `step=32` (sin solape) tendríamos una cuarta parte de los segmentos y la red no tendría esa señal de invariancia traslacional. La contraparte es que segmentos consecutivos comparten 24 columnas — los ejemplos no son del todo independientes.
 
 2. **Por qué el flip mapea los lados de los tubos.**
-   Los caracteres `<` y `>` codifican el **lado izquierdo** y el **lado derecho** de un tubo, respectivamente (análogo con `[` y `]` para los topes). Si flipparamos sin mapear, el lado izquierdo del tubo aparecería en la posición derecha del segmento — pero seguiría dibujándose con el sprite de "lado izquierdo", lo que produciría tubos visualmente rotos (con la curvatura del frente apuntando hacia afuera). El mapeo `<` ↔ `>` y `[` ↔ `]` mantiene la consistencia: un tubo flippeado sigue siendo un tubo válido. Es un caso particular de un principio más general en *data augmentation*: las transformaciones tienen que respetar las simetrías reales del dominio, no las del array.
+   Los caracteres `<` y `>` codifican el **lado izquierdo** y el **lado derecho** de un tubo, respectivamente (análogo con `[` y `]` para los topes). Si aplicáramos el flip sin mapear, el lado izquierdo del tubo aparecería en la posición derecha del segmento — pero seguiría dibujándose con el sprite de "lado izquierdo", lo que produciría tubos visualmente rotos (con la curvatura del frente apuntando hacia afuera). El mapeo `<` ↔ `>` y `[` ↔ `]` mantiene la consistencia: un tubo reflejado sigue siendo un tubo válido. Es un caso particular de un principio más general en *data augmentation*: las transformaciones tienen que respetar las simetrías reales del dominio, no las del array.
 
 3. **Riesgo de memorización.**
    Con un corpus tan chico, hay riesgo concreto de que el generador termine **memorizando trozos de los niveles originales** y los reproduzca casi tal cual. La diversidad real del modelo está limitada por la variedad estructural de los 31 niveles fuente, no por los cientos de segmentos solapados. En la práctica vamos a ver que los niveles generados se parecen mucho a "remezclas" del corpus: el generador aprende a producir patrones plausibles localmente (un tubo verde, una hilera de monedas, una plataforma flotante) pero combinándolos de manera que tienden a reproducir las composiciones originales. Esto es esperable en GANs sobre datasets chicos y no es un bug — es la realidad de aprender una distribución muy concentrada.
@@ -502,8 +502,8 @@ El dataset tiene **31 niveles** completos, pero el `len(dataset)` da varios cien
 ::::cell{#intro-secB type=markdown role=intro}
 Antes de armar el generador y el discriminador vamos a definir los **dos bloques de construcción** que se repiten en cada uno. La idea es la misma que en una DCGAN clásica:
 
-- `G_block`: bloque de **subida de resolución** que va al generador. Hace `ConvTranspose2d` (con `stride=2`, así duplica alto y ancho) seguido de `BatchNorm2d` y `ReLU`.
-- `D_block`: bloque de **bajada de resolución** que va al discriminador. Hace `Conv2d` (con `stride=2`, así reduce a la mitad alto y ancho) seguido de `LeakyReLU` (sin batchnorm).
+- `G_block`: bloque de **subida de resolución** con el que vamos a armar el generador. Hace `ConvTranspose2d` (con `stride=2`, así duplica alto y ancho) seguido de `BatchNorm2d` y `ReLU`.
+- `D_block`: bloque de **bajada de resolución** con el que vamos a armar el discriminador. Hace `Conv2d` (con `stride=2`, así reduce a la mitad alto y ancho) seguido de `LeakyReLU` (sin batchnorm).
 
 > **Pista:** la asimetría `BatchNorm + ReLU` (generador) vs `solo LeakyReLU` (discriminador) viene del paper original de DCGAN (Radford et al. 2015). Es una receta empírica que estabiliza el entrenamiento. La `LeakyReLU` en el discriminador asegura que pasen pendientes negativas — sin eso, las neuronas que se vuelven negativas al inicio nunca recuperan gradiente.
 ::::
@@ -516,7 +516,7 @@ Antes de armar el generador y el discriminador vamos a definir los **dos bloques
 
 **Enunciado:**
 
-**Parte A — `G_block` (subida de resolución):**
+**Parte A — `G_block` (subida de resolución)** _(primera celda de código de abajo)_:
 
 1. Heredá de `nn.Module`.
 2. En `__init__` instanciá tres capas con los argumentos del constructor:
@@ -525,7 +525,7 @@ Antes de armar el generador y el discriminador vamos a definir los **dos bloques
    - `nn.ReLU()`.
 3. En `forward(x)` aplicalas en orden: convolución transpuesta → batchnorm → activación.
 
-**Parte B — `D_block` (bajada de resolución):**
+**Parte B — `D_block` (bajada de resolución)** _(segunda celda de código de abajo)_:
 
 1. Igual al anterior pero con `nn.Conv2d` en lugar de `ConvTranspose2d`, **sin batchnorm**, y con `nn.LeakyReLU(alpha)` en lugar de `nn.ReLU`.
 2. En `forward(x)` aplicá: convolución → activación.
@@ -610,6 +610,46 @@ class D_block(nn.Module):
 ::::
 
 
+::::cell{#test-dims-ej2 type=markdown role=intro}
+#### Test de dimensiones del Ejercicio 2
+
+Antes de seguir, conviene verificar que tus bloques transforman las formas como esperamos. La celda de abajo prueba tres casos:
+
+1. Un `G_block` con argumentos por defecto (kernel `4`, stride `2`, padding `1`) sobre una entrada arbitraria: debe **duplicar** alto y ancho.
+2. El **primer `G_block` del generador** (kernel `(3, 5)`, stride `(1, 2)`, padding `(0, 1)`) sobre una entrada `(100, 1, 4)`: debe llevar a `(512, 3, 9)`.
+3. Un `D_block` con argumentos por defecto sobre una entrada arbitraria: debe **reducir a la mitad** alto y ancho.
+
+Si ves `[OK]` en cada línea, tus bloques están bien implementados a nivel de dimensiones.
+::::
+
+
+::::cell{#test-dims-ej2-code type=code role=verification}
+```python
+def chequear_dimensiones(nombre, salida, esperado):
+    estado = "OK " if tuple(salida.shape) == tuple(esperado) else "MAL"
+    print(f"  [{estado}] {nombre}: salida {tuple(salida.shape)}, esperado {tuple(esperado)}")
+
+
+# ─── Caso 1: G_block con defaults duplica alto y ancho ──────────────────────
+entrada_g = torch.randn(2, 16, 8, 8, device=device)
+salida_g = G_block(in_channels=16, out_channels=32).to(device)(entrada_g)
+chequear_dimensiones("G_block defaults (k=4, s=2)", salida_g, (2, 32, 16, 16))
+
+# ─── Caso 2: primer G_block del generador (kernel rectangular) ──────────────
+entrada_g0 = torch.randn(2, 100, 1, 4, device=device)
+g0 = G_block(in_channels=100, out_channels=512,
+             kernel_size=(3, 5), strides=(1, 2), padding=(0, 1)).to(device)
+salida_g0 = g0(entrada_g0)
+chequear_dimensiones("G_block primero (k=(3,5), s=(1,2))", salida_g0, (2, 512, 3, 9))
+
+# ─── Caso 3: D_block con defaults divide alto y ancho ───────────────────────
+entrada_d = torch.randn(2, 16, 16, 16, device=device)
+salida_d = D_block(in_channels=16, out_channels=32).to(device)(entrada_d)
+chequear_dimensiones("D_block defaults (k=4, s=2)", salida_d, (2, 32, 8, 8))
+```
+::::
+
+
 ::::cell{#ej2-pregunta type=markdown role=pregunta}
 **Pregunta de análisis:**
 
@@ -648,15 +688,16 @@ La arquitectura es una pila de `G_block` que va **subiendo la resolución espaci
 La progresión espacial es:
 
 ```
-(1, 4)   →   (3, 8)   →   (6, 16)   →   (12, 32)   →   (14, 32)
+(1, 4)   →   (3, 9)   →   (6, 18)   →   (12, 36)   →   (14, 32)
               ↑              ↑              ↑              ↑
          G_block(1,2)    G_block(2,2)   G_block(2,2)   ConvTranspose
          (kernel       (kernel        (kernel        (kernel (3,1),
           (3,5))         clásico        clásico        stride 1)
                          (4,4))         (4,4))
+
 ```
 
-El primer bloque tiene un **kernel rectangular** `(3, 5)` con stride `(1, 2)` para empezar a expandir solo la dirección horizontal. Los dos siguientes son bloques DCGAN clásicos (kernel 4, stride 2, padding 1). El bloque final no es un `G_block`: es solo una `ConvTranspose2d` seguida de **`tanh`**, sin batchnorm ni ReLU. La `tanh` mapea cada salida al rango `[-1, +1]`, que es exactamente el rango en el que codificamos los datos reales.
+El primer bloque tiene un **kernel rectangular** `(3, 5)` con stride `(1, 2)` para empezar a expandir solo la dirección horizontal. Los dos siguientes son bloques DCGAN clásicos (kernel 4, stride 2, padding 1): cada uno **duplica el alto y el ancho** (de ahí la progresión `3 → 6 → 12` en alto y `9 → 18 → 36` en ancho). El bloque final no es un `G_block`: es solo una `ConvTranspose2d` seguida de **`tanh`**, sin batchnorm ni ReLU. Su kernel `(3, 1)` agranda el alto en 2 (de 12 a 14), y su `padding=2` con `kernel=1` en el ancho actúa al revés que de costumbre: **recorta** el ancho de 36 a 32 (en convolución transpuesta, cuando el padding supera a `kernel - 1` la salida se achica en vez de crecer). La `tanh` final mapea cada salida al rango `[-1, +1]`, que es exactamente el rango en el que codificamos los datos reales.
 ::::
 
 
@@ -669,10 +710,10 @@ El primer bloque tiene un **kernel rectangular** `(3, 5)` con stride `(1, 2)` pa
 
 1. Heredá de `nn.Module`.
 2. En `__init__` definí `self.net = nn.Sequential(...)` con, en orden:
-   - Un `G_block(in_channels=latent_dim, out_channels=n_g*8, kernel_size=(3, 5), strides=(1, 2), padding=(0, 1))`. Lleva de `(latent_dim, 1, 4)` a `(n_g*8, 3, 8)`.
-   - Un `G_block(in_channels=n_g*8, out_channels=n_g*4)`. Lleva a `(n_g*4, 6, 16)`.
-   - Un `G_block(in_channels=n_g*4, out_channels=n_g*2)`. Lleva a `(n_g*2, 12, 32)`.
-   - Una `nn.ConvTranspose2d(n_g*2, vocab_size, kernel_size=(3, 1), stride=(1, 1), padding=(0, 2), bias=False)`. Lleva a `(vocab_size, 14, 32)`.
+   - Un `G_block(in_channels=latent_dim, out_channels=n_g*8, kernel_size=(3, 5), strides=(1, 2), padding=(0, 1))`. Lleva de `(latent_dim, 1, 4)` a `(n_g*8, 3, 9)`.
+   - Un `G_block(in_channels=n_g*8, out_channels=n_g*4)`. Lleva a `(n_g*4, 6, 18)`.
+   - Un `G_block(in_channels=n_g*4, out_channels=n_g*2)`. Lleva a `(n_g*2, 12, 36)`.
+   - Una `nn.ConvTranspose2d(n_g*2, vocab_size, kernel_size=(3, 1), stride=(1, 1), padding=(0, 2), bias=False)`. Recorta el ancho de 36 a 32 y agranda el alto de 12 a 14, llevando a `(vocab_size, 14, 32)`.
    - Una `nn.Tanh()`.
 3. En `forward(z)` devolvé `self.net(z)`.
 
@@ -697,12 +738,17 @@ class Generator(nn.Module):
     def __init__(self, vocab_size, latent_dim=100, n_g=64):
         super().__init__()
         # ─── Pila de upsampling: (latent_dim, 1, 4) → (vocab_size, 14, 32) ──
-        # Cada G_block duplica las dimensiones espaciales (excepto el primero,
-        # que tiene un kernel rectangular para empezar a expandir solo el
-        # ancho). El bloque final NO es un G_block: es una ConvTranspose2d
-        # seguida de tanh, sin batchnorm ni ReLU. La tanh mapea cada canal
-        # al rango [-1, +1], que es el rango en el que codificamos los datos
-        # reales en el dataset.
+        # Progresión espacial real:
+        #   (1, 4) -> (3, 9) -> (6, 18) -> (12, 36) -> (14, 32)
+        # El primer G_block usa kernel rectangular (3, 5) con stride (1, 2)
+        # para empezar a expandir solo el ancho. Los dos siguientes son
+        # bloques DCGAN clásicos y duplican alto y ancho. El bloque final
+        # NO es un G_block: es una ConvTranspose2d con kernel (3, 1) que
+        # agranda el alto en 2 y, gracias al padding (0, 2) > kernel-1 en
+        # el eje ancho, RECORTA el ancho de 36 a 32 (en convolución
+        # transpuesta, cuando padding > kernel-1 la salida se achica).
+        # Después de tanh, la salida queda en el rango [-1, +1] que es el
+        # rango en el que codificamos los datos reales.
         self.net = nn.Sequential(
             G_block(in_channels=latent_dim, out_channels=n_g * 8,
                     kernel_size=(3, 5), strides=(1, 2), padding=(0, 1)),
@@ -723,6 +769,62 @@ class Generator(nn.Module):
 G = Generator(vocab_size=VOCAB_SIZE).to(device)
 z_demo = torch.randn(2, 100, 1, 4, device=device)
 print(f"Forma de la salida del generador: {G(z_demo).shape}")
+```
+::::
+
+
+::::cell{#test-dims-ej3 type=markdown role=intro}
+#### Test de dimensiones del Ejercicio 3
+
+La celda de abajo recorre el generador **capa por capa** y verifica las formas intermedias contra los valores esperados:
+
+```
+(B, 100, 1, 4)  →  (B, 512, 3, 9)  →  (B, 256, 6, 18)  →  (B, 128, 12, 36)  →  (B, 13, 14, 32)
+```
+
+Si alguna línea da `[MAL]`, sabés exactamente en qué bloque se rompió la cuenta.
+::::
+
+
+::::cell{#test-dims-ej3-code type=code role=verification}
+```python
+def chequear_dimensiones(nombre, salida, esperado):
+    estado = "OK " if tuple(salida.shape) == tuple(esperado) else "MAL"
+    print(f"  [{estado}] {nombre}: salida {tuple(salida.shape)}, esperado {tuple(esperado)}")
+
+
+# ─── Forwardear capa por capa y comparar contra lo esperado ─────────────────
+G_test = Generator(vocab_size=VOCAB_SIZE).to(device)
+z = torch.randn(2, 100, 1, 4, device=device)
+
+esperadas = [
+    (2, 512, 3, 9),               # G_block 1 (kernel rectangular)
+    (2, 256, 6, 18),              # G_block 2 (clásico)
+    (2, 128, 12, 36),             # G_block 3 (clásico)
+    (2, VOCAB_SIZE, 14, 32),      # ConvTranspose final (recorta el ancho)
+    (2, VOCAB_SIZE, 14, 32),      # Tanh (no cambia forma)
+]
+nombres = [
+    "G_block 1 (kernel (3,5), stride (1,2))",
+    "G_block 2 (clásico)",
+    "G_block 3 (clásico)",
+    "ConvTranspose final (kernel (3,1), padding (0,2))",
+    "Tanh",
+]
+
+print(f"Entrada: {tuple(z.shape)}")
+
+# ─── Chequeo de cantidad de capas (detectar capas faltantes) ────────────────
+n_capas = len(list(G_test.net))
+if n_capas != len(esperadas):
+    print(f"  [MAL] Tu Generator tiene {n_capas} capas en self.net pero se "
+          f"esperan {len(esperadas)}. Revisá que estén TODAS las capas que "
+          f"pide el enunciado (incluida la nn.Tanh() final).")
+else:
+    x = z
+    for nombre, capa, esp in zip(nombres, G_test.net, esperadas):
+        x = capa(x)
+        chequear_dimensiones(nombre, x, esp)
 ```
 ::::
 
@@ -837,6 +939,62 @@ print(f"Forma de la salida del discriminador: {D(x_demo).shape}")
 ::::
 
 
+::::cell{#test-dims-ej4 type=markdown role=intro}
+#### Test de dimensiones del Ejercicio 4
+
+La celda de abajo recorre el discriminador **capa por capa** y verifica las formas intermedias contra los valores esperados:
+
+```
+(B, 13, 14, 32)  →  (B, 64, 7, 16)  →  (B, 128, 3, 8)  →  (B, 256, 1, 4)  →  (B, 1, 1, 1)  →  (B, 1)
+```
+
+Si alguna línea da `[MAL]`, sabés exactamente en qué capa se rompió la cuenta.
+::::
+
+
+::::cell{#test-dims-ej4-code type=code role=verification}
+```python
+def chequear_dimensiones(nombre, salida, esperado):
+    estado = "OK " if tuple(salida.shape) == tuple(esperado) else "MAL"
+    print(f"  [{estado}] {nombre}: salida {tuple(salida.shape)}, esperado {tuple(esperado)}")
+
+
+# ─── Forwardear capa por capa y comparar contra lo esperado ─────────────────
+D_test = Discriminator(vocab_size=VOCAB_SIZE).to(device)
+x_in = torch.randn(2, VOCAB_SIZE, 14, 32, device=device)
+
+esperadas = [
+    (2, 64, 7, 16),     # D_block 1
+    (2, 128, 3, 8),     # D_block 2
+    (2, 256, 1, 4),     # D_block 3
+    (2, 1, 1, 1),       # Conv2d final
+    (2, 1),             # Flatten
+]
+nombres = [
+    "D_block 1 (clásico)",
+    "D_block 2 (clásico)",
+    "D_block 3 (clásico)",
+    "Conv2d final (kernel (1,4))",
+    "Flatten",
+]
+
+print(f"Entrada: {tuple(x_in.shape)}")
+
+# ─── Chequeo de cantidad de capas (detectar capas faltantes) ────────────────
+n_capas = len(list(D_test.net))
+if n_capas != len(esperadas):
+    print(f"  [MAL] Tu Discriminator tiene {n_capas} capas en self.net pero "
+          f"se esperan {len(esperadas)}. Revisá que estén TODAS las capas "
+          f"que pide el enunciado (incluido el nn.Flatten() final).")
+else:
+    h = x_in
+    for nombre, capa, esp in zip(nombres, D_test.net, esperadas):
+        h = capa(h)
+        chequear_dimensiones(nombre, h, esp)
+```
+::::
+
+
 ::::cell{#ej4-pregunta type=markdown role=pregunta}
 **Pregunta de análisis:**
 
@@ -892,7 +1050,7 @@ La pérdida en ambos casos es la **entropía cruzada binaria** (`BCEWithLogitsLo
 
 **Enunciado:**
 
-**Parte A — `update_D(real, Z, G, D, opt_D)`:**
+**Parte A — `update_D(real, Z, G, D, opt_D)`** _(primera celda de código de abajo)_:
 
 1. Hacé `opt_D.zero_grad()` para limpiar gradientes acumulados.
 2. Pasá `real` por el discriminador: `d_real = D(real)`.
@@ -903,7 +1061,7 @@ La pérdida en ambos casos es la **entropía cruzada binaria** (`BCEWithLogitsLo
 7. Sumá las dos pérdidas, hacé `loss_D.backward()` y `opt_D.step()`.
 8. Devolvé `loss_D`.
 
-**Parte B — `update_G(Z, G, D, opt_G)`:**
+**Parte B — `update_G(Z, G, D, opt_G)`** _(segunda celda de código de abajo)_:
 
 1. Hacé `opt_G.zero_grad()`.
 2. Generá los falsos: `fake = G(Z)`.
@@ -1025,7 +1183,7 @@ A diferencia de las redes supervisadas que viste antes, acá hay **dos optimizad
 
 > **Tiempos esperados:** con GPU, **200 épocas** sobre este dataset toman entre 1 y 2 minutos. Si el dispositivo detectado es `cpu`, el entrenamiento puede llevar varias horas — volvé al menú de Colab y activá la GPU antes de continuar.
 
-> **Cómo leer las curvas de una GAN:** en una GAN **las pérdidas no bajan monótonamente**. El equilibrio sano es una "danza" donde las dos curvas oscilan dentro de un rango razonable: si `D` tiende a `0` el discriminador está ganando todo el tiempo y `G` no aprende; si `G` tiende a `0` y `D` se dispara, suele ser señal de mode collapse. Lo que querés ver es a las dos curvas **moverse cerca de `log(2) ≈ 0.69`** (el valor de equilibrio teórico para `BCE` con dos clases balanceadas), con oscilaciones pero sin dispararse.
+> **Cómo leer las curvas de una GAN:** en una GAN **las pérdidas no bajan monótonamente**. El equilibrio sano es una "danza" donde las dos curvas oscilan dentro de un rango razonable: si `D` tiende a `0` el discriminador está ganando todo el tiempo y `G` no aprende; si `G` tiende a `0` y `D` se dispara, suele ser señal de mode collapse. Los valores de equilibrio teórico (cuando `D(x) ≈ 0.5` para cualquier entrada) son distintos para cada curva: **`G loss` se mueve cerca de `log(2) ≈ 0.69`** y **`D loss` cerca de `2·log(2) ≈ 1.39`**, porque `D loss` suma las dos ramas (real y falsa) y cada una aporta `log(2)`. Lo que querés ver es a las dos curvas oscilando alrededor de esos valores, sin dispararse.
 ::::
 
 
@@ -1036,7 +1194,7 @@ A diferencia de las redes supervisadas que viste antes, acá hay **dos optimizad
 
 **Enunciado:**
 
-**Parte A — Implementar `train_gan(G, D, dataloader, epochs, lr, latent_dim)`:**
+**Parte A — Implementar `train_gan(G, D, dataloader, epochs, lr, latent_dim)`** _(primera celda de código de abajo)_:
 
 1. Crear los dos optimizadores Adam:
    - `opt_G = torch.optim.Adam(G.parameters(), lr=lr, betas=(0.5, 0.999))`
@@ -1053,7 +1211,7 @@ A diferencia de las redes supervisadas que viste antes, acá hay **dos optimizad
    - Imprimir el progreso cada 20 épocas (y en la primera).
 5. Devolver `d_hist, g_hist`.
 
-**Parte B — Ejecutar:**
+**Parte B — Ejecutar** _(segunda celda de código de abajo)_:
 
 1. Instanciar `G = Generator(vocab_size=VOCAB_SIZE).to(device)` y `D = Discriminator(vocab_size=VOCAB_SIZE).to(device)`.
 2. Llamar a `train_gan(G, D, data_iter, epochs=200, lr=2e-4, latent_dim=100)` y guardar las dos listas en `d_hist`, `g_hist`.
@@ -1145,7 +1303,7 @@ Mirá las curvas de pérdida del entrenamiento. A diferencia de una red supervis
 **Respuesta a la pregunta de análisis:**
 
 1. **Patrón general.**
-   Las dos curvas oscilan, no bajan monótonamente. En las primeras épocas suele haber una fase de transitorio donde `D loss` está alta y `G loss` baja (el discriminador todavía no distingue, el generador "engaña" trivialmente). A medida que `D` aprende, `D loss` baja un poco y `G loss` sube — empieza el balance adversario. En régimen estable las dos curvas se mantienen oscilando alrededor de valores cercanos a `log(2) ≈ 0.69` (valor de equilibrio teórico cuando `D` está cerca de `0.5` para cualquier entrada). Es esperable que sigan oscilando hasta el final del entrenamiento: en GANs no existe el concepto de "convergencia" como en regresión.
+   Las dos curvas oscilan, no bajan monótonamente. En las primeras épocas suele haber una fase de transitorio donde `D loss` está alta y `G loss` baja (el discriminador todavía no distingue, el generador "engaña" trivialmente). A medida que `D` aprende, `D loss` baja un poco y `G loss` sube — empieza el balance adversario. En régimen estable las dos curvas se mantienen oscilando alrededor de sus respectivos valores de equilibrio teórico (cuando `D(x) ≈ 0.5` para cualquier entrada): **`G loss` cerca de `log(2) ≈ 0.69`** y **`D loss` cerca de `2·log(2) ≈ 1.39`** (porque `D loss` suma las dos ramas, real y falsa, y cada una aporta `log(2)`). Es esperable que sigan oscilando hasta el final del entrenamiento: en GANs no existe el concepto de "convergencia" como en regresión.
 
 2. **Si `D loss` colapsa cerca de `0`.**
    Eso significa que el discriminador clasifica casi perfectamente entre reales y falsos. Cuando eso pasa, los logits de `D(fake)` son muy negativos (muy seguro de que son falsos), y `sigmoid(logit) ≈ 0`. La pérdida del generador `BCE(logit, y=1)` sigue dando un número finito, pero el **gradiente** que llega a `G` es muy chico — la función sigmoide está saturada en su parte plana. En la práctica, el generador deja de aprender: no recibe señal útil para mejorar sus salidas. Es lo que se llama el **problema del gradiente desvaneciente del generador**.
@@ -1178,13 +1336,13 @@ La interpolación es la prueba cualitativa más interesante de una GAN: muestra 
 
 **Enunciado:**
 
-**Parte A — Muestras del prior.**
+**Parte A — Muestras del prior** _(primera celda de código de abajo)_.
 
 1. Poné el generador en modo evaluación: `G.eval()`.
 2. Sin construir el grafo de gradientes (`with torch.no_grad():`), generá **4 niveles** desde ruido aleatorio: `z = torch.randn(4, 100, 1, 4, device=device)` y `samples = G(z)`.
 3. Mostralos con `mostrar_segmentos(list(samples.cpu()), sprites)`.
 
-**Parte B — Interpolación entre dos niveles.**
+**Parte B — Interpolación entre dos niveles** _(segunda celda de código de abajo)_.
 
 1. Generá **dos vectores latentes** distintos `z_a` y `z_b`, cada uno con forma `(1, 100, 1, 4)`.
 2. Construí una **trayectoria de 8 pasos** entre los dos: para cada `t` en `torch.linspace(0, 1, 8)`, calculá `z_t = (1 - t) * z_a + t * z_b` y juntalos en un único tensor de forma `(8, 100, 1, 4)`.
