@@ -33,29 +33,54 @@ materias:
     nombre: "Análisis de Señales y Sistemas"
     repo: "git@github.com:ASyS-utn-frm/python.git"
     contract_version: null
-    estado: sin-decidir
+    estado: adopcion-parcial
     layout: null
     notas: |
-      NO TOCAR hasta decidir cómo unificar. Repo compartido con la cátedra
-      (org ASyS-utn-frm).
+      Repo compartido con la cátedra (org ASyS-utn-frm). Auditado 2026-08-02.
 
-      No es un repo "sin framework": ya tiene uno propio y completo, que
-      compite con lab-notebook punto por punto.
+      El contrato aplica a los labs NUEVOS (L01..L08, por escribir). Los
+      TP0..TP4 son material a sustituir, no a migrar: `docs/PROJECT_PLAN.md`
+      ya tiene el mapa de transición (TP0 → L0+L1, TP1 → L2, TP2 → L3,
+      TP3 → L4, TP4 → L7 + L5/L8). Se conservan solo como referencia por si
+      algo sirve. No validarlos ni regenerarlos.
+
+      L00_practica_python es el único lab vivo y el más cercano al contrato:
+      9 `enu` y 9 `act` pareados 1:1.
+
+      El repo tiene su propio tooling, que conviene conocer antes de tocar:
 
         fuente única     src/*.md → tools/md2nb.py  (vs. .lab.md → lab_build.py)
         delimitador      `%% tipo id`               (vs. ::::cell{#id ...})
-        roles            por prefijo del id:        (vs. sufijo del id:
-                         act / enu / hdr                 ejN-code / ejN-enunciado)
+        roles            prefijo del id: prov /     (vs. sufijo del id:
+                         act / enu / hdr                 ejN-code, ejN-enunciado)
         placeholder      `# TU CÓDIGO AQUÍ`         (vs. `# Tu código aquí`)
         extracción       tools/extract_student.py   (vs. bloques `solution`)
         rúbricas         rubrics/*.md en markdown   (vs. .rubric.yaml)
-        guía de estilo   docs/GUIA_ESTILO.md +
-                         docs/FORMATO_CELDAS.md
 
-      Adoptar el contrato acá es una migración con dos sistemas a reconciliar,
-      no una instalación. Decidir primero cuál gana en cada dimensión: puede
-      convenir que lab-notebook absorba ideas de este repo (los roles por
-      prefijo son más legibles) en vez de imponerse.
+      Dos huecos para que la app pueda corregir acá:
+        - No existen soluciones. Las fuentes tienen solo la versión del
+          alumno. La app requiere un notebook de solución ejecutado.
+        - No hay rol de pregunta/respuesta de análisis. Decisión didáctica
+          pendiente: si no se agregan, la app corrige solo código.
 
-      Estado del material: solo L00_practica_python está al día. Los TP1..TP4
-      y los módulos M01..M09 son viejos y no son referencia de formato.
+      Dos ideas de md2nb que a lab_build.py le faltan y valdría robar: la
+      directiva `@header` que embebe el logo en base64 (lab_build depende de
+      una URL de Imgur, que es frágil) y el `role` en la metadata de celda.
+
+  - id: pln
+    nombre: "Procesamiento del Lenguaje Natural"
+    repo: null
+    contract_version: "1.0.0"
+    estado: por-arrancar
+    layout:
+      sources:    "sources"
+      enunciados: "Laboratorios"
+      soluciones: "Soluciones"
+      rubricas:   "rubricas"
+    notas: |
+      Materia nueva, sin repo todavía. Nace con el contrato: arrancar con
+
+        python <plugin>/scripts/materia_init.py <dir> \
+            --nombre "Procesamiento del Lenguaje Natural" --id pln
+
+      y después completar `repo` acá y la ruta en paths.local.yaml.

@@ -33,6 +33,33 @@ existe, asumí el layout por defecto:
 **Nunca edites un `.ipynb` a mano si existe su `.lab.md`.** Se
 regeneran en cada compilación y perdés el cambio.
 
+### Si la materia todavía no tiene layout
+
+Cuando el repo no tiene `.labconfig.yaml` y es el primer lab de esa
+materia, arrancá con el scaffolder en vez de armar las carpetas a mano:
+
+```bash
+python ${CLAUDE_PLUGIN_ROOT}/scripts/materia_init.py <directorio> \
+    --nombre "Nombre de la materia" --id <id-corto>
+```
+
+Crea el layout, el `.labconfig.yaml`, un `CLAUDE.md` con lo mínimo que
+hace falta, y deja una copia del `.lab.md` de ejemplo en `sources/`.
+Nunca pisa archivos existentes, así que es seguro correrlo sobre un repo
+que ya tiene contenido. Aceptá `--dry-run` para ver qué haría.
+
+Después hay que registrar la materia en el repo `lab-corrector`
+(`materias/registry.yaml` y `materias/paths.local.yaml`), que es lo que
+permite saber a qué repos hay que ir cuando cambia el contrato.
+
+### Para empezar un lab
+
+Copiá `templates/ejemplo.lab.md` (o el `sources/_ejemplo_formato.lab.md`
+que dejó el scaffolder) y escribí encima. Es una referencia ejecutable:
+compila y pasa el validador sin errores, y muestra los tres tipos de
+ejercicio — el patrón usual de cuatro celdas, uno con varias partes de
+código, y uno de solo análisis.
+
 ## El contrato de `cell_id`
 
 Regex canónico. Una celda es corregible si —y solo si— su id matchea:
@@ -97,11 +124,27 @@ lógica análoga usa `markdown solution`.
 Formato completo, frontmatter y limitaciones conocidas del compilador:
 `reference/lab-md.md`.
 
+## Dónde están los scripts
+
+Depende de cómo esté instalado el plugin:
+
+- **Como plugin** (`/plugin install lab-notebook`): en
+  `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+- **Por symlink** en `~/.claude/skills/lab-notebook`: en el repo
+  `lab-corrector`, bajo `plugins/lab-notebook/scripts/`.
+
+Si no sabés cuál es el caso, resolvelo una vez y reusá el path:
+
+```bash
+S=$(dirname $(dirname $(readlink ~/.claude/skills/lab-notebook 2>/dev/null || echo "$CLAUDE_PLUGIN_ROOT/skills/x")))/scripts
+ls $S   # lab_build.py, lab_validate.py, lab_contract.py, materia_init.py
+```
+
 ## Compilar y validar
 
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/scripts/lab_build.py <archivo.lab.md>
-python ${CLAUDE_PLUGIN_ROOT}/scripts/lab_validate.py <enunciado.ipynb> [solucion.ipynb]
+python $S/lab_build.py <archivo.lab.md>
+python $S/lab_validate.py <enunciado.ipynb> [solucion.ipynb]
 ```
 
 `lab_build.py` es stdlib pura, no necesita entorno virtual.

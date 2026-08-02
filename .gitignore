@@ -18,3 +18,4 @@ __pycache__/
 # Paths locales de cada materia (ver paths.local.example.yaml)
 materias/paths.local.yaml
 .claude/settings.local.json
+__pycache__/
