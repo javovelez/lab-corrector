@@ -160,7 +160,7 @@ por `rubric_gen` y por la app. Esto incluye:
 - IDs hexadecimales random generados por Jupyter cuando se inserta
   una celda extra.
 
-Convención adicional desde [`_TPS/README.md`](../_TPS/README.md): los
+Convención adicional desde [`estilo.md`](estilo.md): los
 ids "fijos" del framework usan nombres descriptivos en kebab-case
 sin guion bajo. No empiecen con `ej` para evitar el regex.
 
@@ -220,13 +220,13 @@ aparecen al cargar la rúbrica o al entrar a la vista corrección:
 - **`cell_id` esperado por la rúbrica que no existe en el notebook**
   del alumno: la app muestra un panel "celda esperada faltante" y
   ofrece el navegador `↑/↓`. Detalle en
-  [10-troubleshooting.md](10-troubleshooting.md).
+  la doc de la app (`docs/10-troubleshooting.md` en el repo `lab-corrector`).
 
 ## Migración de notebooks pre-framework (Lab 2)
 
 Lab 2 se escribió antes del framework: cada `ejN-pregunta` contenía
 la pregunta + el placeholder `*(Escribí tu respuesta acá)*` en la
 **misma celda**. La convención exige celdas separadas. Hay un parche
-en [`tools/lab2_split_pregunta.py`](../tools/lab2_split_pregunta.py)
+en [`scripts/lab2_split_pregunta.py`](../../../scripts/lab2_split_pregunta.py)
 que divide cada `ejN-pregunta` en pregunta + respuesta — detalle en
-[10-troubleshooting.md](10-troubleshooting.md#lab-2-celdas-pegadas).
+la doc de la app (`docs/10-troubleshooting.md` en el repo `lab-corrector`).

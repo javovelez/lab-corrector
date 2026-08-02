@@ -10,7 +10,7 @@ en el enunciado se olvida en la solución, o al revés.
 
 La fuente única `.lab.md` resuelve esto editando un solo archivo
 markdown que se compila a los dos notebooks. El compilador es
-[`tools/lab_build.py`](../tools/lab_build.py) y vive en el repo.
+[`scripts/lab_build.py`](../../../scripts/lab_build.py) y vive en el repo.
 
 ## Layout de archivos
 
@@ -65,7 +65,7 @@ contenido de la celda
 
 - `#cell_id` es el `cell_id` literal que va al `.ipynb`. Tiene que
   cumplir la convención del framework — ver
-  [08-convenciones-cellids.md](08-convenciones-cellids.md).
+  [cell-ids.md](cell-ids.md).
 - `type` es `markdown` o `code`.
 - `role` es informativo (`enunciado`, `student-code`, `pregunta`,
   `student-answer`, `setup`, `header`, `rules`, `section`,
@@ -137,12 +137,12 @@ El ejemplo `_ejemplo_formato.lab.md` muestra bloques fenced
 (no los procesa). Están pensados para una versión futura del
 compilador que genere el scaffolding de la `.rubric.yaml` directamente
 desde la fuente — ver pendiente #4 en
-[12-decisiones-y-roadmap.md](12-decisiones-y-roadmap.md).
+el roadmap del repo `lab-corrector`.
 
 ## Cómo se compila
 
 ```
-python tools/lab_build.py _TPS/sources/Laboratorio_3a.lab.md
+python <plugin>/scripts/lab_build.py sources/Laboratorio_3a.lab.md
 ```
 
 El script:
@@ -172,11 +172,11 @@ guardados (eso lo necesita la rúbrica para inferir `graded_outputs`).
 ## Ciclo de edición habitual
 
 1. Editar `_TPS/sources/Laboratorio_X.lab.md`.
-2. `python tools/lab_build.py _TPS/sources/Laboratorio_X.lab.md` — sobreescribe los dos `.ipynb`.
+2. `python <plugin>/scripts/lab_build.py sources/Laboratorio_X.lab.md` — sobreescribe los dos `.ipynb`.
 3. Abrir `_TPS/Soluciones/Laboratorio_X_Solucion.ipynb` en Jupyter,
    "Reiniciar y ejecutar todo", y guardar (esto persiste los outputs).
 4. (Si es un lab nuevo) regenerar la rúbrica:
-   `app/.venv/bin/python tools/rubric_build.py X`.
+   generarla desde la app de corrección.
 5. Probar el enunciado en Colab haciendo "ejecutar todo" como si
    fueras el alumno.
 
