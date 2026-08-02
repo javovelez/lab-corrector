@@ -20,6 +20,7 @@ Opciones de layout (por defecto, el de RNP):
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -188,20 +189,54 @@ def main():
         shutil.copy2(src_ejemplo, dst_ejemplo)
         print(f"  copiado     {ejemplo_dst}")
 
-    print(f"""
-Siguiente paso:
+    registrado = registrar_path_local(args.mid, destino, args.dry_run)
 
-  1. Registrá la materia en el repo lab-corrector:
-     materias/registry.yaml       (id: {args.mid}, nombre, repo, contract_version)
-     materias/paths.local.yaml    ({args.mid}: {destino})
-
-  2. Escribí tu primer lab copiando el ejemplo:
-     cp {ejemplo_dst} {args.sources}/{args.prefijo}1.lab.md
+    print(f"\nSiguiente paso:\n")
+    if not registrado:
+        print(f"  1. Registrá la ruta local en el repo lab-corrector:")
+        print(f"       materias/paths.local.yaml → {args.mid}: \"{destino}\"")
+        print(f"     y completá `repo:` en materias/registry.yaml cuando exista"
+              f" el remoto.\n")
+    else:
+        print(f"  1. Completá `repo:` en materias/registry.yaml cuando exista"
+              f" el remoto.\n")
+    print(f"""  2. Escribí tu primer lab copiando el ejemplo:
+       cp {ejemplo_dst} {args.sources}/{args.prefijo}1.lab.md
 
   3. Compilá y validá:
-     python {SCRIPTS}/lab_build.py {args.sources}/{args.prefijo}1.lab.md
-     python {SCRIPTS}/lab_validate.py {args.enunciados}/{args.prefijo}1.ipynb
+       python {SCRIPTS}/lab_build.py {args.sources}/{args.prefijo}1.lab.md
+       python {SCRIPTS}/lab_validate.py {args.enunciados}/{args.prefijo}1.ipynb
 """)
+
+
+def registrar_path_local(mid: str, destino: Path, dry_run: bool) -> bool:
+    """Anota la ruta local en lab-corrector si este script corre desde ahí.
+
+    Cuando el plugin está instalado por copia (`/plugin install`), el repo
+    no está al alcance y no hay nada que registrar: se devuelve False y el
+    usuario lo hace a mano.
+    """
+    repo = SCRIPTS.parent.parent.parent          # …/lab-corrector
+    paths_local = repo / "materias" / "paths.local.yaml"
+    if not (repo / "materias" / "registry.yaml").is_file():
+        return False
+
+    linea = f'  {mid}: "{destino}"\n'
+    if paths_local.is_file():
+        texto = paths_local.read_text(encoding="utf-8")
+        if re.search(rf'^\s*{re.escape(mid)}\s*:', texto, re.M):
+            print(f"\n  ya registrado en paths.local.yaml: {mid}")
+            return True
+        nuevo = texto.rstrip("\n") + "\n" + linea
+    else:
+        nuevo = "# Paths locales de esta máquina. Ignorado por git.\npaths:\n" + linea
+
+    if dry_run:
+        print(f"\n  registraría {mid} en {paths_local}")
+    else:
+        paths_local.write_text(nuevo, encoding="utf-8")
+        print(f"\n  registrado {mid} en materias/paths.local.yaml")
+    return True
 
 
 if __name__ == "__main__":

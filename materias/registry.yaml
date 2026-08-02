@@ -57,11 +57,13 @@ materias:
         extracción       tools/extract_student.py   (vs. bloques `solution`)
         rúbricas         rubrics/*.md en markdown   (vs. .rubric.yaml)
 
-      Dos huecos para que la app pueda corregir acá:
-        - No existen soluciones. Las fuentes tienen solo la versión del
-          alumno. La app requiere un notebook de solución ejecutado.
-        - No hay rol de pregunta/respuesta de análisis. Decisión didáctica
-          pendiente: si no se agregan, la app corrige solo código.
+      Dos huecos que hay que cubrir al escribir L01 en adelante (decidido
+      2026-08-02):
+        - Soluciones: no existen en el material viejo. Los labs nuevos se
+          escriben con enunciado y solución en el mismo .lab.md (bloques
+          `python solution` / `markdown solution`).
+        - Preguntas de análisis: SÍ van. El material viejo no tiene ese
+          rol; los labs nuevos llevan ejN-pregunta + ejN-respuesta.
 
       Dos ideas de md2nb que a lab_build.py le faltan y valdría robar: la
       directiva `@header` que embebe el logo en base64 (lab_build depende de
