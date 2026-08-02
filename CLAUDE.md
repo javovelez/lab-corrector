@@ -35,6 +35,19 @@ agrupación en ítems corregibles.
 No actualices la `contract_version` de una materia en el registro hasta
 que esa materia esté efectivamente migrada.
 
+## Dónde vive la rúbrica
+
+En los dos lados a la vez, y **no son la misma rúbrica**:
+
+- La del repo de la materia (p. ej. `_TPS/rubricas/`) es la de **testeo**:
+  la que se usa para probar el lab mientras se desarrolla.
+- La del workdir (`<workdir>/.corrector/rubrica.yaml`) es la de
+  **corrección**: la que se aplica a las entregas reales de esa cursada.
+
+Divergen a propósito. No hay sincronización automática ni la debe haber:
+si hace falta llevar una de un lado al otro, la copia el docente. No
+agregues código que las unifique, ni avisos de que están desincronizadas.
+
 ## Al cambiar la app
 
 Si el cambio afecta lo que la app espera de un notebook (nuevos campos

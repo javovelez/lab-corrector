@@ -28,18 +28,32 @@ materias:
 
   - id: asys
     nombre: "Análisis de Señales y Sistemas"
-    repo: "git@github.com:ASyS-utn-frm/ASyS.git"
-    path_local: "/Users/javiervelez/Library/CloudStorage/OneDrive-docentes.frm.utn.edu.ar/Apuntes y repos/ASyS"
+    repo: "git@github.com:ASyS-utn-frm/python.git"
+    path_local: "/Users/javiervelez/Library/CloudStorage/OneDrive-docentes.frm.utn.edu.ar/UTN/1_ASYS/practica/Jupyer_Notebooks"
     contract_version: null
-    estado: en-adopcion
-    layout:
-      sources:    "sources"
-      enunciados: "."
-      soluciones: "."
-      rubricas:   "rubricas"
+    estado: sin-decidir
+    layout: null
     notas: |
-      Repo compartido con la cátedra (org ASyS-utn-frm). Los TPs actuales son
-      pre-framework: pares ASyS_tpN.ipynb / ASyS_tpN_sol.ipynb sin cell_id de
-      contrato. Adoptar el contrato lab por lab, empezando por los nuevos.
-      El layout no usa carpetas Laboratorios/Soluciones, así que necesita un
-      .labconfig.yaml con prefijo "ASyS_tp" y sufijo_solucion "_sol".
+      NO TOCAR hasta decidir cómo unificar. Repo compartido con la cátedra
+      (org ASyS-utn-frm).
+
+      No es un repo "sin framework": ya tiene uno propio y completo, que
+      compite con lab-notebook punto por punto.
+
+        fuente única     src/*.md → tools/md2nb.py  (vs. .lab.md → lab_build.py)
+        delimitador      `%% tipo id`               (vs. ::::cell{#id ...})
+        roles            por prefijo del id:        (vs. sufijo del id:
+                         act / enu / hdr                 ejN-code / ejN-enunciado)
+        placeholder      `# TU CÓDIGO AQUÍ`         (vs. `# Tu código aquí`)
+        extracción       tools/extract_student.py   (vs. bloques `solution`)
+        rúbricas         rubrics/*.md en markdown   (vs. .rubric.yaml)
+        guía de estilo   docs/GUIA_ESTILO.md +
+                         docs/FORMATO_CELDAS.md
+
+      Adoptar el contrato acá es una migración con dos sistemas a reconciliar,
+      no una instalación. Decidir primero cuál gana en cada dimensión: puede
+      convenir que lab-notebook absorba ideas de este repo (los roles por
+      prefijo son más legibles) en vez de imponerse.
+
+      Estado del material: solo L00_practica_python está al día. Los TP1..TP4
+      y los módulos M01..M09 son viejos y no son referencia de formato.
