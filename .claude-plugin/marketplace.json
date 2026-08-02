@@ -1,0 +1,18 @@
+{
+  "name": "lab-corrector",
+  "owner": {
+    "name": "Javier Vélez",
+    "email": "javovelez@gmail.com"
+  },
+  "metadata": {
+    "description": "Framework de laboratorios corregibles para materias de UTN FRM",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "lab-notebook",
+      "source": "./plugins/lab-notebook",
+      "description": "Contrato de autoría de notebooks compatibles con la app de corrección: convención de cell_id, formato .lab.md, guía de estilo, compilador y validador."
+    }
+  ]
+}

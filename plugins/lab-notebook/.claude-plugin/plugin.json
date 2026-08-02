@@ -1,0 +1,10 @@
+{
+  "name": "lab-notebook",
+  "description": "Contrato de autoría de notebooks de laboratorio compatibles con la app de corrección: convención de cell_id, formato de fuente única .lab.md, guía de estilo, compilador y validador.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Javier Vélez",
+    "email": "javovelez@gmail.com"
+  },
+  "keywords": ["laboratorio", "notebook", "jupyter", "docencia", "utn"]
+}

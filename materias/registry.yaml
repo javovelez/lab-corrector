@@ -1,0 +1,45 @@
+# Registro de materias que consumen el contrato `lab-notebook`.
+#
+# Sirve para una sola cosa: cuando cambia el contrato o la app, saber a qué
+# repos hay que ir y qué hay que tocar en cada uno. Corré:
+#
+#     python materias/check.py
+#
+# `contract_version` es la versión del contrato con la que cada materia está
+# alineada. Cuando subís CONTRACT_VERSION en lab_contract.py, todas las
+# materias quedan atrasadas hasta que las migrás y actualizás este archivo.
+
+materias:
+  - id: rnp
+    nombre: "Redes Neuronales Profundas"
+    repo: "git@github.com:javovelez/rnp-material-clases.git"
+    path_local: "/Users/javiervelez/Library/CloudStorage/OneDrive-docentes.frm.utn.edu.ar/UTN/3_RNP/material clases"
+    contract_version: "1.0.0"
+    estado: activa
+    layout:
+      sources:    "_TPS/sources"
+      enunciados: "_TPS/Laboratorios"
+      soluciones: "_TPS/Soluciones"
+      rubricas:   "_TPS/rubricas"
+    notas: |
+      Los enunciados publicados viven en un repo aparte (tps_RNP), clonado
+      dentro de _TPS/Laboratorios/ e ignorado por git. Las rúbricas
+      publicadas están en schema v1; la app las normaliza en memoria.
+
+  - id: asys
+    nombre: "Análisis de Señales y Sistemas"
+    repo: "git@github.com:ASyS-utn-frm/ASyS.git"
+    path_local: "/Users/javiervelez/Library/CloudStorage/OneDrive-docentes.frm.utn.edu.ar/Apuntes y repos/ASyS"
+    contract_version: null
+    estado: en-adopcion
+    layout:
+      sources:    "sources"
+      enunciados: "."
+      soluciones: "."
+      rubricas:   "rubricas"
+    notas: |
+      Repo compartido con la cátedra (org ASyS-utn-frm). Los TPs actuales son
+      pre-framework: pares ASyS_tpN.ipynb / ASyS_tpN_sol.ipynb sin cell_id de
+      contrato. Adoptar el contrato lab por lab, empezando por los nuevos.
+      El layout no usa carpetas Laboratorios/Soluciones, así que necesita un
+      .labconfig.yaml con prefijo "ASyS_tp" y sufijo_solucion "_sol".

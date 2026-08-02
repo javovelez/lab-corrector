@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import sys
 from pathlib import Path
 from textwrap import dedent
 
@@ -38,11 +39,15 @@ from claude_agent_sdk import (
 
 from nbparse import cell_outputs, cell_source, find_cell, load_notebook
 
-
-# Acepta `ej{N}-{rol}` con sufijo opcional `-{\w+}`.
-EJ_ID_RE = re.compile(
-    r"^ej(\d+)-(enunciado|code|pregunta|respuesta)(?:-(\w+))?$"
-)
+# El contrato de `cell_id` vive en el plugin `lab-notebook`, que es lo que se
+# distribuye a los repos de materia. La app lo importa de ahí en vez de tener
+# su propia copia: si derivaran, un notebook podría pasar el validador del
+# docente y aun así no ser corregible acá.
+sys.path.insert(0, str(
+    Path(__file__).resolve().parent.parent
+    / "plugins" / "lab-notebook" / "scripts"
+))
+from lab_contract import EJ_ID_RE, analysis_key as _contract_analysis_key  # noqa: E402
 
 
 SYSTEM_PROMPT_RUBRIC = dedent("""
@@ -99,7 +104,7 @@ def _graded_outputs(sol_code_cell: dict | None) -> list[str]:
 
 
 def _analysis_key(ej_id: str, sufijo: str | None) -> str:
-    return f"{ej_id}-analisis" if sufijo is None else f"{ej_id}-analisis-{sufijo}"
+    return _contract_analysis_key(ej_id, sufijo)
 
 
 # ─── Scan: notebook → esqueleto v2 (sin rubrics aún) ──────────────────────────
