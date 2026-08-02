@@ -1,0 +1,11 @@
+# Dónde está clonada cada materia EN ESTA MÁQUINA.
+#
+# Copiá este archivo a `materias/paths.local.yaml` y ajustá las rutas.
+# Ese archivo está en .gitignore: los paths locales no se versionan porque
+# el repo es público y porque cada máquina los tiene distintos.
+#
+# Las claves son el `id` de cada materia en registry.yaml.
+
+paths:
+  rnp:  "~/ruta/a/rnp-material-clases"
+  asys: "~/ruta/al/repo/de/asys"

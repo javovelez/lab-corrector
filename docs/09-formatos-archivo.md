@@ -161,9 +161,9 @@ Registry global de workdirs recientes. Lo gestiona `app/recents.py`.
 
 ```json
 [
-  "/Users/javiervelez/.../2026/lab2",
-  "/Users/javiervelez/.../2025/lab3a",
-  "/Users/javiervelez/.../2025/lab1c"
+  "/ruta/a/correcciones/2026/lab2",
+  "/ruta/a/correcciones/2025/lab3a",
+  "/ruta/a/correcciones/2025/lab1c"
 ]
 ```
 

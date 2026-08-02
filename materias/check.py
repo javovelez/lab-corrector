@@ -34,7 +34,11 @@ sys.path.insert(0, str(SCRIPTS))
 from lab_contract import CONTRACT_VERSION  # noqa: E402
 
 
+PATHS_LOCAL = ROOT / "materias" / "paths.local.yaml"
+
+
 def load_registry() -> list[dict]:
+    """Registro versionado + overlay de paths locales (no versionado)."""
     try:
         import yaml
     except ImportError:
@@ -43,8 +47,28 @@ def load_registry() -> list[dict]:
             file=sys.stderr,
         )
         sys.exit(2)
+
     data = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
-    return data.get("materias", [])
+    materias = data.get("materias", [])
+
+    # Los paths locales viven aparte: el registro se versiona en un repo
+    # público y cada máquina tiene los repos en otro lado.
+    if PATHS_LOCAL.is_file():
+        overlay = (yaml.safe_load(PATHS_LOCAL.read_text(encoding="utf-8")) or {})
+        paths = overlay.get("paths") or {}
+    else:
+        paths = {}
+        print(
+            f"Aviso: no existe {PATHS_LOCAL.name}. Copiá "
+            f"materias/paths.local.example.yaml y ajustá las rutas para poder "
+            f"validar los notebooks.\n",
+            file=sys.stderr,
+        )
+
+    for m in materias:
+        p = paths.get(m.get("id"))
+        m["path_local"] = str(Path(p).expanduser()) if p else ""
+    return materias
 
 
 def parse_version(v: str | None) -> tuple[int, ...]:

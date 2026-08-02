@@ -14,3 +14,7 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# Paths locales de cada materia (ver paths.local.example.yaml)
+materias/paths.local.yaml
+.claude/settings.local.json

@@ -8,12 +8,15 @@
 # `contract_version` es la versión del contrato con la que cada materia está
 # alineada. Cuando subís CONTRACT_VERSION en lab_contract.py, todas las
 # materias quedan atrasadas hasta que las migrás y actualizás este archivo.
+#
+# Este archivo se versiona y el repo es público, así que NO lleva paths
+# locales. Dónde está clonada cada materia en tu máquina va en
+# `materias/paths.local.yaml`, que está en .gitignore. Ver el .example.
 
 materias:
   - id: rnp
     nombre: "Redes Neuronales Profundas"
     repo: "git@github.com:javovelez/rnp-material-clases.git"
-    path_local: "/Users/javiervelez/Library/CloudStorage/OneDrive-docentes.frm.utn.edu.ar/UTN/3_RNP/material clases"
     contract_version: "1.0.0"
     estado: activa
     layout:
@@ -29,7 +32,6 @@ materias:
   - id: asys
     nombre: "Análisis de Señales y Sistemas"
     repo: "git@github.com:ASyS-utn-frm/python.git"
-    path_local: "/Users/javiervelez/Library/CloudStorage/OneDrive-docentes.frm.utn.edu.ar/UTN/1_ASYS/practica/Jupyer_Notebooks"
     contract_version: null
     estado: sin-decidir
     layout: null

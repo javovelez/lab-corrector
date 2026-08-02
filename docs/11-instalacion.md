@@ -18,7 +18,7 @@ ejecución de la app (Streamlit) y los CLIs (`lab_build.py`,
 ## Paso 1 — Clonar / abrir el repo
 
 ```bash
-cd "/Users/javiervelez/Library/CloudStorage/OneDrive-docentes.frm.utn.edu.ar/UTN/3_RNP/material clases"
+cd /ruta/al/repo/lab-corrector
 ```
 
 (O cualquier ruta donde tengas el proyecto.)
