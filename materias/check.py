@@ -159,6 +159,13 @@ def main():
 
         if estado == "sin-decidir":
             print("   sin decidir si adopta el contrato — ver `notas` en el registro")
+        elif estado == "adopcion-parcial":
+            print("   adopción parcial: el contrato rige para los labs nuevos.")
+            print("   El material viejo NO se migra — ver `notas` en el registro.")
+        elif estado == "por-arrancar":
+            print("   materia nueva, sin repo todavía. Arrancar con:")
+            print(f"     python <plugin>/scripts/materia_init.py <dir> "
+                  f"--nombre \"{m['nombre']}\" --id {m.get('id')}")
         elif mv is None:
             desalineadas += 1
             print("   sin adoptar el contrato todavía")
