@@ -133,7 +133,9 @@ def main():
             print()
             continue
 
-        if mv is None:
+        if estado == "sin-decidir":
+            print("   sin decidir si adopta el contrato — ver `notas` en el registro")
+        elif mv is None:
             desalineadas += 1
             print("   sin adoptar el contrato todavía")
             print(f"   pendiente: crear .labconfig.yaml y migrar los cell_id "

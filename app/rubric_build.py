@@ -2,52 +2,60 @@
 """
 Generador CLI de rúbrica a partir de enunciado + solución ya ejecutada.
 
-Uso:
-    app/.venv/bin/python tools/rubric_build.py <lab_id>
+Es el mismo trabajo que hace el botón de auto-generación de la app; sirve
+para cuando querés la rúbrica sin abrir la UI.
 
-donde <lab_id> es el número/sufijo del laboratorio (ej. "3b"). Asume el
-layout estándar _TPS/ y escribe la rúbrica en:
-    _TPS/rubricas/Laboratorio_<lab_id>.rubric.yaml
+Uso:
+    app/.venv/bin/python app/rubric_build.py <enunciado.ipynb> <solucion.ipynb> [-o salida.yaml]
+
+Si no pasás `-o`, escribe al lado del enunciado con extensión
+`.rubric.yaml`.
+
+Los paths son explícitos a propósito: la app es agnóstica de la materia y
+este script también. El layout de cada repo de materia está en su
+`.labconfig.yaml`, no acá.
+
+La solución tiene que estar **ejecutada y guardada con sus outputs**: de
+ahí sale `graded_outputs`.
 
 Requiere las dependencias del venv de la app (claude-agent-sdk, pyyaml).
 """
+import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "app"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rubric import save_rubrica        # noqa: E402
+from rubric import save_rubrica          # noqa: E402
 from rubric_gen import generate_rubrica  # noqa: E402
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Uso: python tools/rubric_build.py <lab_id>", file=sys.stderr)
-        print("  ej: python tools/rubric_build.py 3b", file=sys.stderr)
-        sys.exit(1)
+    ap = argparse.ArgumentParser(
+        description="Genera un .rubric.yaml desde un par enunciado/solución."
+    )
+    ap.add_argument("enunciado", type=Path, help="notebook de enunciado (.ipynb)")
+    ap.add_argument("solucion", type=Path, help="notebook de solución ejecutado (.ipynb)")
+    ap.add_argument("-o", "--out", type=Path, help="destino del .rubric.yaml")
+    ap.add_argument("-t", "--title", help="título de la rúbrica")
+    args = ap.parse_args()
 
-    lab_id = sys.argv[1]
-    tps = ROOT / "_TPS"
-    enun = tps / "Laboratorios" / f"Laboratorio_{lab_id}.ipynb"
-    sol  = tps / "Soluciones"   / f"Laboratorio_{lab_id}_Solucion.ipynb"
-    out  = tps / "rubricas"     / f"Laboratorio_{lab_id}.rubric.yaml"
-
-    for p in (enun, sol):
-        if not p.exists():
+    for p in (args.enunciado, args.solucion):
+        if not p.is_file():
             print(f"No existe: {p}", file=sys.stderr)
             sys.exit(1)
 
-    title = f"Laboratorio n° {lab_id}"
+    out = args.out or args.enunciado.with_suffix(".rubric.yaml")
+    title = args.title or args.enunciado.stem.replace("_", " ")
 
     def prog(i, total, msg):
         print(f"  ({i}/{total}) {msg}")
 
-    print(f"Generando rúbrica para Lab {lab_id}...")
+    print(f"Generando rúbrica para {args.enunciado.name}...")
     rubrica = generate_rubrica(
         title=title,
-        enunciado_nb_path=enun,
-        solucion_nb_path=sol,
+        enunciado_nb_path=args.enunciado,
+        solucion_nb_path=args.solucion,
         progress=prog,
     )
     out.parent.mkdir(parents=True, exist_ok=True)
