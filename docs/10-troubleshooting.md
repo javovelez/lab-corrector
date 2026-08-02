@@ -3,7 +3,7 @@
 Catálogo de los problemas más comunes que aparecen al usar el
 framework, con la causa, el síntoma y la solución concreta. Si lo que
 te pasa no está acá, mirá la página del componente afectado
-(autoría → [02](02-autoria-lab-md.md), rúbrica → [03](03-rubricas.md),
+(autoría → [02](../plugins/lab-notebook/skills/lab-notebook/reference/lab-md.md), rúbrica → [03](03-rubricas.md),
 app → [05](05-app-flujo-correccion.md) – [07](07-ia.md)).
 
 ## Lab 2 — celdas pegadas
@@ -29,7 +29,7 @@ en una sola celda, con id `ejN-pregunta`. La app espera dos celdas:
 respuesta del alumno.
 
 **Solución:** correr el parche
-[`tools/lab2_split_pregunta.py`](../tools/lab2_split_pregunta.py).
+[`lab2_split_pregunta.py`](../plugins/lab-notebook/scripts/lab2_split_pregunta.py).
 El script:
 
 1. Toma un notebook in place.
@@ -50,11 +50,11 @@ Uso:
 
 ```bash
 # Para los notebooks de Lab 2 oficiales (one-time):
-python tools/lab2_split_pregunta.py _TPS/Laboratorios/Laboratorio_2.ipynb
-python tools/lab2_split_pregunta.py _TPS/Soluciones/Laboratorio_2_Solucion.ipynb
+python plugins/lab-notebook/scripts/lab2_split_pregunta.py _TPS/Laboratorios/Laboratorio_2.ipynb
+python plugins/lab-notebook/scripts/lab2_split_pregunta.py _TPS/Soluciones/Laboratorio_2_Solucion.ipynb
 
 # Para una entrega de un alumno (con reference para split exacto):
-python tools/lab2_split_pregunta.py \
+python plugins/lab-notebook/scripts/lab2_split_pregunta.py \
     <workdir>/grupo_05/entrega.ipynb \
     --reference _TPS/Laboratorios/Laboratorio_2.ipynb
 ```
@@ -152,7 +152,7 @@ dio a Claude suficiente contexto.
    "Restart Kernel and Run All", guardá.
 2. Re-corré:
    ```
-   app/.venv/bin/python tools/rubric_build.py X
+   app/.venv/bin/python app/rubric_build.py X
    ```
 3. Si sigue saliendo flojo: editá la rúbrica a mano. Es un YAML
    editable. Lo importante es:
@@ -300,7 +300,7 @@ ambas formas indefinidamente.
 **Solución:**
 
 ```
-python tools/lab_build.py _TPS/sources/Laboratorio_X.lab.md
+python plugins/lab-notebook/scripts/lab_build.py _TPS/sources/Laboratorio_X.lab.md
 ```
 
 Si modificaste el id de una celda y la app de corrección estaba
@@ -309,7 +309,7 @@ faltante" — la rúbrica vieja apunta al id viejo. Regenerar la
 rúbrica:
 
 ```
-app/.venv/bin/python tools/rubric_build.py X
+app/.venv/bin/python app/rubric_build.py X
 ```
 
 ## La app dice "rúbrica no existe" pero el archivo está ahí

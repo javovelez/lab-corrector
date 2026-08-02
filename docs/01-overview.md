@@ -48,20 +48,20 @@ Cualquier notebook que respete el regex `^ej(\d+)-(enunciado|code|pregunta|respu
 funciona con la rúbrica autogenerada y con la app, sin necesidad de
 haber pasado por `lab_build.py`. Eso es deliberado: para Lab 2 (que se
 escribió antes del framework) hubo que aplicar un parche de adaptación
-([`tools/lab2_split_pregunta.py`](../tools/lab2_split_pregunta.py)) y
+([`lab2_split_pregunta.py`](../plugins/lab-notebook/scripts/lab2_split_pregunta.py)) y
 después la app lo corrige sin ningún tratamiento especial.
 
-Detalle del contrato de cell_id: [08-convenciones-cellids.md](08-convenciones-cellids.md).
+Detalle del contrato de cell_id: [08-convenciones-cellids.md](../plugins/lab-notebook/skills/lab-notebook/reference/cell-ids.md).
 
 ## Flujo end-to-end de un lab nuevo
 
 1. **Escribir la fuente** en `_TPS/sources/Laboratorio_X.lab.md` —
    formato Pandoc-style con `::::cell{...}` y bloques fenced para
    marcar enunciado vs. solución. Detalle en
-   [02-autoria-lab-md.md](02-autoria-lab-md.md).
+   [02-autoria-lab-md.md](../plugins/lab-notebook/skills/lab-notebook/reference/lab-md.md).
 2. **Compilar a notebooks**:
    ```
-   python tools/lab_build.py _TPS/sources/Laboratorio_X.lab.md
+   python plugins/lab-notebook/scripts/lab_build.py _TPS/sources/Laboratorio_X.lab.md
    ```
    Produce `_TPS/Laboratorios/Laboratorio_X.ipynb` (enunciado del
    alumno) y `_TPS/Soluciones/Laboratorio_X_Solucion.ipynb` (con
@@ -72,7 +72,7 @@ Detalle del contrato de cell_id: [08-convenciones-cellids.md](08-convenciones-ce
    `graded_outputs`.
 4. **Generar la rúbrica**:
    ```
-   app/.venv/bin/python tools/rubric_build.py X
+   app/.venv/bin/python app/rubric_build.py X
    ```
    Llama a Claude (vía `claude-agent-sdk`, sin API key — usa la sesión
    local de Claude Code) una vez por ítem corregible. Devuelve

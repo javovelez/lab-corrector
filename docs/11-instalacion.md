@@ -30,7 +30,7 @@ python3 -m venv app/.venv
 ```
 
 Esto crea `app/.venv/` con un Python aislado del sistema. Los CLIs
-(`tools/rubric_build.py`) también usan este venv.
+(`app/rubric_build.py`) también usan este venv.
 
 ## Paso 3 — Instalar dependencias
 
@@ -117,24 +117,24 @@ chequeá que los colores de los badges sigan siendo legibles.
 
 ## CLIs disponibles
 
-### `tools/lab_build.py`
+### `lab_build.py` (plugin)
 
 Compila un `.lab.md` a dos `.ipynb` (enunciado + solución). No usa
 el venv (es solo Python estándar):
 
 ```bash
-python tools/lab_build.py _TPS/sources/Laboratorio_3a.lab.md
+python plugins/lab-notebook/scripts/lab_build.py _TPS/sources/Laboratorio_3a.lab.md
 ```
 
-Detalle en [02-autoria-lab-md.md](02-autoria-lab-md.md).
+Detalle en [02-autoria-lab-md.md](../plugins/lab-notebook/skills/lab-notebook/reference/lab-md.md).
 
-### `tools/rubric_build.py`
+### `app/rubric_build.py`
 
 Genera la rúbrica YAML de un lab vía Claude. Usa el venv (necesita
 `claude-agent-sdk` y `pyyaml`):
 
 ```bash
-app/.venv/bin/python tools/rubric_build.py 3b
+app/.venv/bin/python app/rubric_build.py 3b
 ```
 
 Asume layout `_TPS/`: lee
@@ -145,13 +145,13 @@ tener outputs guardados.
 
 Detalle en [03-rubricas.md](03-rubricas.md).
 
-### `tools/lab2_split_pregunta.py`
+### `plugins/lab-notebook/scripts/lab2_split_pregunta.py`
 
 Parche one-off para Lab 2 (notebooks pre-framework). No usa el venv
 (es Python estándar):
 
 ```bash
-python tools/lab2_split_pregunta.py <notebook.ipynb>
+python plugins/lab-notebook/scripts/lab2_split_pregunta.py <notebook.ipynb>
 ```
 
 Detalle en [10-troubleshooting.md#lab-2-celdas-pegadas](10-troubleshooting.md#lab-2--celdas-pegadas).
@@ -164,7 +164,7 @@ material clases/
 │   ├── .venv/                ← virtualenv (no checked-in)
 │   ├── *.py                  ← código de la app
 │   └── requirements.txt
-├── tools/
+├── plugins/lab-notebook/scripts/
 │   ├── lab_build.py
 │   ├── rubric_build.py
 │   └── lab2_split_pregunta.py

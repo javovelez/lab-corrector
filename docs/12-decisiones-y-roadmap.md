@@ -166,7 +166,7 @@ Claude SDK.
 
 ### 5. Generación de scaffolding de rúbrica desde el `.lab.md`
 
-**Qué es:** extender `tools/lab_build.py` para que al compilar un
+**Qué es:** extender `lab_build.py` (plugin) para que al compilar un
 `.lab.md` también emita el scaffolding de la `.rubric.yaml`
 correspondiente, con los `cell_id` ya pre-rellenados (sacándolos del
 `.lab.md` directamente) y dejando `expected`/`common_errors` para

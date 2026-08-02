@@ -132,7 +132,7 @@ y `forget` desde el botón "quitar" del landing.
 `main.py` es el orquestador y el único módulo que conoce Streamlit.
 Todos los demás son librerías puras Python sin estado global más allá
 del filesystem. Esto facilita testear cada uno por separado y reusar
-`rubric_gen` desde `tools/rubric_build.py`.
+`rubric_gen` desde `app/rubric_build.py`.
 
 ## State management en Streamlit
 

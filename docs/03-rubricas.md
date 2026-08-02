@@ -191,13 +191,13 @@ Ante fallo del SDK o JSON mal formado, el item queda con
 "common_errors": ["(error: ...)"]}` para que el docente vea qué
 falló y lo complete.
 
-## CLI: `tools/rubric_build.py`
+## CLI: `app/rubric_build.py`
 
 Wrapper para regenerar la rúbrica de un lab desde la línea de
 comandos. Asume el layout estándar `_TPS/`.
 
 ```bash
-app/.venv/bin/python tools/rubric_build.py 3b
+app/.venv/bin/python app/rubric_build.py 3b
 ```
 
 Lee `_TPS/Laboratorios/Laboratorio_3b.ipynb` y

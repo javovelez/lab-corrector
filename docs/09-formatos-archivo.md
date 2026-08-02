@@ -7,7 +7,7 @@ de estos archivos sin levantar la app.
 ## `.lab.md` (fuente única del lab)
 
 Markdown con frontmatter YAML + bloques `::::cell{...}`. Detalle
-completo en [02-autoria-lab-md.md](02-autoria-lab-md.md).
+completo en [02-autoria-lab-md.md](../plugins/lab-notebook/skills/lab-notebook/reference/lab-md.md).
 
 Path: `_TPS/sources/Laboratorio_<id>.lab.md`.
 
