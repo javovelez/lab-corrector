@@ -68,24 +68,52 @@ Celda markdown fija, mismo texto en todos los laboratorios. Cell id:
 ## IMPORTANTE: qué celdas podés modificar
 
 Este laboratorio es un **entregable**. Solo debés completar las celdas de
-actividad, que son las que aparecen con el comentario `# Tu código aquí` o
-el texto `*(Escribí tu respuesta acá)*`. Todas las demás celdas (enunciados,
-explicaciones, ejemplos provistos y el encabezado) **no se tocan**: la
-corrección se hace celda por celda de manera automática y modificar lo que no
-corresponde puede invalidar tu entrega.
+actividad, que son las que aparecen con el comentario `# Tu código aquí` o el
+texto `*(Escribí tu respuesta acá)*`. Todas las demás celdas —enunciados,
+explicaciones, ejemplos provistos y encabezado— **no se tocan**.
 
-Si necesitás probar algo fuera de una celda de actividad, hacelo en una copia
-aparte y revertí los cambios antes de entregar.
+La corrección se hace celda por celda: cada respuesta se busca en la celda
+donde el enunciado la pide. Si escribís en otro lado, o si movés, renombrás o
+borrás celdas del enunciado, esa parte de tu entrega queda sin poder
+corregirse.
+
+Si querés probar algo suelto, hacelo en la misma celda de actividad o en una
+celda nueva que agregues, y borrala antes de entregar.
 ```
 
 Esta celda no es cosmética: es la que hace viable la corrección por
 `cell_id`. Va en todos los labs.
 
-### 4. Imports
+Dos cosas que el texto evita a propósito:
+
+- **No dice que la corrección sea "automática".** Corrige el docente, con la
+  app como herramienta. Lo que hay que transmitirle al alumno es la
+  consecuencia práctica —si no usa las celdas previstas, su respuesta no se
+  puede corregir—, no cómo funciona la app por dentro.
+- **No le pide trabajar sobre una copia del notebook.** Es mucho pedir y
+  nadie lo hace. Probar en la misma celda, o en una nueva que después se
+  borra, alcanza.
+
+### 4. Imports y celdas de setup
 
 Celda de código con los imports necesarios, ya ejecutable. Cell id:
-`imports`. En labs extensos, el setup completo va en una celda `setup-*`
-que el alumno recibe lista para correr.
+`imports`. En labs extensos, el setup completo va en una o varias celdas
+`setup-*` que el alumno recibe listas para correr.
+
+**Toda celda de setup se presenta en una celda markdown propia, antes de la
+celda de código.** Cell id: el del setup con el sufijo `-intro`
+(`setup-datos` → `setup-datos-intro`). La presentación explica qué hace la
+celda, qué nombres deja definidos y qué decisiones ya tomadas conviene que el
+alumno entienda antes de seguir. Cuando hay varias celdas de setup seguidas,
+la primera presentación abre con un encabezado `## Preparación` y anticipa
+qué hace cada una.
+
+Los comentarios adentro de la celda de código **no son el lugar para esa
+presentación**. Ahí van, como mucho, explicaciones cortas de qué hace una
+línea o de la forma de un tensor. Un bloque de diez líneas de comentario al
+tope de una celda es texto de enunciado escrito en el lugar equivocado:
+mucha gente no lee los comentarios, y en un notebook la prosa se lee mejor
+renderizada que adentro de un `#`.
 
 ### 5. Secciones temáticas
 
@@ -159,7 +187,69 @@ alumno.
 **Celda de test** (code, opcional): verifica que la arquitectura o una
 parte de ella esté bien implementada. Solo cuando aporta.
 
-### 7. Checklist de entrega
+**Ejercicio con partes A y B:** cada parte se presenta por separado, con su
+enunciado inmediatamente antes de su celda de código:
+
+```
+ej2-enunciado      (objetivo del ejercicio + Parte A)
+ej2-code-a
+ej2-enunciado-b    (Parte B)
+ej2-code-b
+ej2-pregunta
+ej2-respuesta
+```
+
+No juntar las dos partes en un solo enunciado y después poner las dos celdas
+de código seguidas: obliga al alumno a subir y bajar, y hace que la Parte B
+se lea con la cabeza puesta en la A. El enunciado sin sufijo es el que la app
+usa como enunciado del ejercicio; los que llevan sufijo se ignoran, así que
+lo que tiene que quedar sí o sí en el primero es el `### Ejercicio N —` y el
+`**Objetivo:**`. Las pistas van con la parte a la que corresponden.
+
+### 7. Cómo se redacta una consigna
+
+Es lo que más cuesta y lo que más rinde. Tres reglas:
+
+**1. Si el ejercicio practica algo que está en la teoría, la consigna se
+redacta; no se muestra el código.** El trabajo que se le pide al alumno es
+volver al notebook de teoría, entender qué hace ese código y trasladarlo a
+una situación nueva. Si la consigna trae la línea escrita, ese trabajo
+desaparece y el ejercicio se vuelve copiar y pegar.
+
+```markdown
+mal   Fijá la semilla con `torch.manual_seed(0)` y creá
+      `vectores = torch.rand(4, 6, 8)`.
+
+bien  Fijá la semilla del generador de PyTorch en 0 y creá, en una variable
+      llamada `vectores`, un tensor de forma `(4, 6, 8)` con números al azar
+      entre 0 y 1.
+```
+
+Esto exige consignas bien escritas: la ambigüedad que antes tapaba el código
+ahora hay que resolverla con vocabulario preciso.
+
+**2. Si el ejercicio va más allá de la teoría, se puede mostrar código —pero
+hay que explicar qué se está agregando y por qué.** Cuando el lab introduce
+una función, un método o una técnica que la teoría no trata, o la trata con
+menos profundidad, corresponde presentarla: qué hace, para qué la usamos acá,
+y que no estaba en la clase. Lo que no va nunca es una consigna que dé por
+sabido algo que el alumno no vio.
+
+**3. Vocabulario preciso, sin ambigüedad.** La consigna se lee una vez y
+tiene que quedar clara.
+
+- Al pedir que se cree algo, decir **qué se crea y cómo se llama**: "creá un
+  tensor y guardalo en una variable llamada `ids`", no "construí ids".
+- Nombrar cada cosa por lo que es: *tensor*, *variable*, *función*, *método*,
+  *capa*. No "`ids` y `vectores` tienen tipos distintos" sino "los tensores
+  `ids` y `vectores`".
+- Nada de referencias sueltas a "los datos que ya tenés" o "pasale esto": si
+  hay un dato de entrada, va escrito; si hay una operación, se dice cuál.
+- Los datos de entrada (una lista de casos de prueba, un corpus juguete, una
+  lista de palabras de sondeo) **sí** van como bloque de código en la
+  consigna. Eso es dato, no solución.
+
+### 8. Checklist de entrega
 
 Antes del cierre, celda markdown. Cell id: `checklist`.
 
@@ -178,7 +268,7 @@ Revisá esta checklist rápida:
 Los ítems se ajustan por laboratorio (por ejemplo agregar "Los tests
 pasan sin errores" si el lab tiene celdas de test).
 
-### 8. Cierre
+### 9. Cierre
 
 Celda markdown final. Cell id: `footer`.
 
@@ -207,6 +297,14 @@ Celda markdown final. Cell id: `footer`.
   el término técnico en inglés en cursiva, o castellano técnico estándar.
 - El tono es técnico pero didáctico: explica el concepto y el porqué, no
   solo el procedimiento.
+- **Evitar la metáfora contable** ("esto se paga después", "el precio es",
+  "sale más barato"). Suena a manual de divulgación y además esconde la
+  información: decí *qué* se pierde y *en qué unidad*. "Se paga en tiempo de
+  cómputo", "usa el doble de memoria", "recorta el 30% de las órdenes".
+- Ningún párrafo debería obligar a releerlo para entender de qué habla. Si
+  una oración arranca con una construcción abstracta ("entre X y la primera
+  capa hay una cadena de decisiones"), primero se dice concretamente de qué
+  se trata y después se la nombra.
 
 ### Énfasis y formato inline
 
@@ -307,6 +405,13 @@ se captura con `try/except` y se imprime el mensaje.
 - [ ] Los metadatos de asignatura y bloque están presentes.
 - [ ] Todas las secciones abren con `---` en celda propia.
 - [ ] Cada ejercicio tiene sus celdas de enunciado, código y análisis.
+- [ ] Cada celda de setup tiene su celda markdown de presentación antes.
+- [ ] En los ejercicios de varias partes, cada parte tiene su enunciado
+      inmediatamente antes de su celda de código.
+- [ ] Ninguna consigna muestra el código que el alumno tiene que escribir,
+      salvo que sea contenido que la teoría no cubre — y en ese caso está
+      explicado.
+- [ ] Las consignas dicen cómo se llama cada variable que hay que crear.
 - [ ] Los placeholders son exactamente `# Tu código aquí` y
       `*(Escribí tu respuesta acá)*`.
 - [ ] Pregunta y respuesta están en celdas separadas.
