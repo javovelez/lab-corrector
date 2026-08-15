@@ -249,6 +249,30 @@ tiene que quedar clara.
   lista de palabras de sondeo) **sí** van como bloque de código en la
   consigna. Eso es dato, no solución.
 
+**4. La respuesta oficial contesta lo que se preguntó, y nada más.** La
+rúbrica se genera *desde* la respuesta oficial: todo lo que ella diga se
+convierte en algo que se le exige al alumno. Un párrafo de más —el dato
+lindo, el adelanto de la unidad que viene, la evidencia extra que a nadie se
+le pidió— no es generosidad, es un ítem más en la rúbrica y una injusticia
+con el que contestó exactamente lo que se le preguntó.
+
+La forma de revisarlo es leer la pregunta y la respuesta juntas y marcar, para
+cada párrafo de la respuesta, cuál de las consignas contesta. El párrafo que
+no contesta ninguna sobra, y ahí hay dos salidas:
+
+- **Podar la respuesta.** Es lo habitual, sobre todo si lo que sobra es un
+  cierre que mira hacia adelante. Ese material no se pierde: va al enunciado,
+  al cierre del lab o a una explicación en prosa que no se corrige.
+- **Ampliar la pregunta.** Vale cuando lo que sobra es tan bueno que uno
+  quiere que el alumno lo piense. Entonces se pide de manera explícita, y se
+  paga el costo de un ítem más — respetando el tope de dos incisos.
+
+El caso inverso también se corrige tocando la pregunta: si la respuesta se va
+de largo porque la consigna encadenó cuatro pedidos en un inciso, el problema
+es la consigna. Y si un inciso repite algo que ya se preguntó en otro lab o en
+otro ejercicio del mismo, conviene bajarlo a prosa del enunciado —queda dicho,
+sin ocupar un ítem corregible.
+
 ### 8. Checklist de entrega
 
 Antes del cierre, celda markdown. Cell id: `checklist`.
@@ -415,6 +439,8 @@ se captura con `try/except` y se imprime el mensaje.
 - [ ] Los placeholders son exactamente `# Tu código aquí` y
       `*(Escribí tu respuesta acá)*`.
 - [ ] Pregunta y respuesta están en celdas separadas.
+- [ ] Cada párrafo de la respuesta oficial contesta alguna de las consignas
+      de su pregunta, y ninguna consigna quedó sin contestar.
 - [ ] Las pistas van en blockquote con `**Pista:**` en negrita.
 - [ ] No hay emoticones en ninguna celda.
 - [ ] El lenguaje usa voseo de forma consistente.
