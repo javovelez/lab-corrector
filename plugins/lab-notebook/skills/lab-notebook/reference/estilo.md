@@ -208,7 +208,7 @@ lo que tiene que quedar sí o sí en el primero es el `### Ejercicio N —` y el
 
 ### 7. Cómo se redacta una consigna
 
-Es lo que más cuesta y lo que más rinde. Tres reglas:
+Es lo que más cuesta y lo que más rinde. Seis reglas:
 
 **1. Si el ejercicio practica algo que está en la teoría, la consigna se
 redacta; no se muestra el código.** El trabajo que se le pide al alumno es
@@ -261,7 +261,48 @@ tiene que quedar clara.
   lista de palabras de sondeo) **sí** van como bloque de código en la
   consigna. Eso es dato, no solución.
 
-**4. La respuesta oficial contesta lo que se preguntó, y nada más.** La
+**4. La consigna tiene que construir todo lo que un ejercicio posterior usa.**
+Es el defecto más caro de un lab y el más difícil de ver leyendo ejercicio por
+ejercicio, porque cada uno por separado se entiende bien. Aparece de cuatro
+formas:
+
+- Una **función se pide con una firma** y la solución la define con un parámetro
+  de más, que recién hace falta dos ejercicios después.
+- Una **variable que un enunciado posterior nombra** como si existiera y que
+  ninguna consigna pidió crear ("Tenés `E_dist`...").
+- Una **estructura intermedia que solo aparece en una pista**. Una pista orienta;
+  no pide. Lo que sobrevive al ejercicio va en un punto numerado.
+- Una **celda de setup que deja definidos nombres que su presentación no lista**.
+
+El alumno que hace exactamente lo pedido queda trabado, o produce números que no
+coinciden con la solución oficial, y en la corrección eso se lee como error suyo.
+La solución oficial suele disimularlo con valores por defecto o parámetros que no
+están dichos en ninguna parte, y entonces los números salen bien por accidente de
+la firma.
+
+La forma de revisarlo es **seguir la cadena de nombres**, no el orden de los
+ejercicios: para cada identificador que un enunciado menciona, buscar la consigna
+numerada que lo crea; y comparar cada firma de la consigna contra la de la
+solución, parámetro por parámetro. Cuando un parámetro existe solo para un
+ejercicio posterior, se lo pide igual y se dice para qué.
+
+**5. La metáfora que no describe el mecanismo se reemplaza.** Es la hermana de la
+regla de la metáfora contable, más abajo. Una imagen vale cuando el lector se
+lleva el mecanismo; cuando solo se lleva la imagen, ocupa el lugar de la
+explicación y encima suele ser inexacta.
+
+```markdown
+mal   Muestreo negativo: de 15.548 clases a una moneda cargada
+bien  Muestreo negativo: de 15.548 clases a una decisión binaria
+
+mal   mostrar dónde se le ve la costura
+bien  mostrar dónde falla
+
+mal   un esquema de pesos disfrazado de sorteo
+bien  un esquema de pesos implementado como sorteo
+```
+
+**6. La respuesta oficial contesta lo que se preguntó, y nada más.** La
 rúbrica se genera *desde* la respuesta oficial: todo lo que ella diga se
 convierte en algo que se le exige al alumno. Un párrafo de más —el dato
 lindo, el adelanto de la unidad que viene, la evidencia extra que a nadie se
@@ -469,6 +510,14 @@ se captura con `try/except` y se imprime el mensaje.
       salvo que sea contenido que la teoría no cubre — y en ese caso está
       explicado.
 - [ ] Las consignas dicen cómo se llama cada variable que hay que crear.
+- [ ] Cada nombre que un enunciado menciona como existente tiene una consigna
+      numerada que lo crea, y ninguna estructura que sobreviva al ejercicio se
+      introduce solo en una pista.
+- [ ] Las firmas de las consignas coinciden, parámetro por parámetro, con las de
+      la solución.
+- [ ] Cada celda de setup lista, en su presentación, los nombres que deja
+      definidos.
+- [ ] No hay metáforas que reemplacen la explicación del mecanismo.
 - [ ] Los placeholders son exactamente `# Tu código aquí` y
       `*(Escribí tu respuesta acá)*`.
 - [ ] Pregunta y respuesta están en celdas separadas.
