@@ -243,6 +243,18 @@ tiene que quedar clara.
 - Nombrar cada cosa por lo que es: *tensor*, *variable*, *función*, *método*,
   *capa*. No "`ids` y `vectores` tienen tipos distintos" sino "los tensores
   `ids` y `vectores`".
+- Vale en particular al **pedir que se escriba algo**: un identificador con
+  paréntesis no dice si lo que hay que escribir es una función suelta, un
+  método de una clase o la clase entera, y el alumno lo tiene que deducir de
+  la firma. Se dice.
+
+  ```markdown
+  mal   Escribí `codificar_lote(self, textos, largo)`, que devuelve un
+        tensor `(B, largo)`.
+
+  bien  Escribí el método `codificar_lote(self, textos, largo)` de la clase
+        `Vocabulario`, que devuelve un tensor `(B, largo)`.
+  ```
 - Nada de referencias sueltas a "los datos que ya tenés" o "pasale esto": si
   hay un dato de entrada, va escrito; si hay una operación, se dice cuál.
 - Los datos de entrada (una lista de casos de prueba, un corpus juguete, una
@@ -311,6 +323,27 @@ Celda markdown final. Cell id: `footer`.
 
 - **Español rioplatense con voseo**: "creá", "usá", "imprimí",
   "completá", "respondé", "observá".
+- **El voseo no es una licencia para el registro coloquial.** La forma verbal
+  es rioplatense; el vocabulario es técnico. Un apunte de cátedra no dice
+  "arrancá de un tensor de ceros", "mirá esta tabla" ni "sus vecinos son
+  basura". Los reemplazos habituales:
+
+  | coloquial | técnico |
+  |---|---|
+  | arrancá / arrancar de | partí / partir de, empezar en |
+  | mirá, fijate | observá, revisá, notá |
+  | ojo con | atención a, cuidado con |
+  | acordate de | recordá |
+  | andá a ver | revisá, consultá |
+  | a ojo | por intuición, sin medir |
+  | tirar (datos, un error) | descartar; lanzar (una excepción) |
+  | el truco, la magia | el mecanismo, la técnica |
+  | de un plumazo | de una sola vez |
+  | tal cual | sin cambios, sin modificarlo |
+  | basura, poquísimo, fortísimo | sin sentido, muy poco, muy fuerte |
+
+  La prueba es leerlo en voz alta como si lo dijera la cátedra en el pizarrón:
+  lo que suene a conversación de pasillo se reemplaza.
 - Los términos técnicos establecidos en inglés se mantienen en inglés y
   van en cursiva la primera vez que aparecen en una sección:
   *broadcasting*, *forward pass*, *overfitting*.
@@ -443,7 +476,9 @@ se captura con `try/except` y se imprime el mensaje.
       de su pregunta, y ninguna consigna quedó sin contestar.
 - [ ] Las pistas van en blockquote con `**Pista:**` en negrita.
 - [ ] No hay emoticones en ninguna celda.
-- [ ] El lenguaje usa voseo de forma consistente.
+- [ ] El lenguaje usa voseo de forma consistente, y sin coloquialismos.
+- [ ] Cada consigna que pide escribir algo dice si es una función, un método
+      o una clase.
 - [ ] `lab_validate.py` da cero errores sobre el enunciado.
 - [ ] La solución está ejecutada y guardada con sus outputs.
 - [ ] La celda de checklist de entrega está antes del cierre.
