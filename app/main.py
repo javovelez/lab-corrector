@@ -249,6 +249,16 @@ st.markdown(
     [data-testid="stAppViewContainer"] .block-container {
         padding-right: 125px !important;
     }
+    /* Los tooltips de `help=` molestan al corregir: aparecen encima de
+       la matriz cada vez que el mouse pasa por un botón. Los textos se
+       dejan en el código (documentan el widget para quien lo lea) y se
+       ocultan acá. Si un upgrade de Streamlit renombra estos testid,
+       los tooltips vuelven a aparecer; se arregla actualizando el
+       selector, no borrando los `help=`. */
+    [data-testid="stTooltipContent"],
+    [data-baseweb="tooltip"] {
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
