@@ -32,57 +32,117 @@ materias:
   - id: asys
     nombre: "Análisis de Señales y Sistemas"
     repo: "git@github.com:ASyS-utn-frm/python.git"
-    contract_version: null
-    estado: adopcion-parcial
-    layout: null
+    contract_version: "1.0.0"
+    estado: activa
+    layout:
+      sources:    "_fuente/sources"
+      enunciados: "Laboratorios"
+      soluciones: "_fuente/Soluciones"
+      rubricas:   "_fuente/rubricas"
     notas: |
-      Repo compartido con la cátedra (org ASyS-utn-frm). Auditado 2026-08-02.
+      Repo compartido con la cátedra (org ASyS-utn-frm). Auditado 2026-08-02
+      y migrado al contrato el mismo día.
 
-      El contrato aplica a los labs NUEVOS (L01..L08, por escribir). Los
-      TP0..TP4 son material a sustituir, no a migrar: `docs/PROJECT_PLAN.md`
-      ya tiene el mapa de transición (TP0 → L0+L1, TP1 → L2, TP2 → L3,
-      TP3 → L4, TP4 → L7 + L5/L8). Se conservan solo como referencia por si
-      algo sirve. No validarlos ni regenerarlos.
+      ATENCIÓN — el repo de la cátedra es PÚBLICO y sirve GitHub Pages. Como
+      el .lab.md lleva la solución adentro, las fuentes y las soluciones NO
+      pueden vivir ahí. Van en un repo PRIVADO montado dentro del público
+      como `_fuente/`, que el público ignora por .gitignore. Es el patrón
+      inverso al de rnp (allá el público se monta adentro del privado).
 
-      L00_practica_python es el único lab vivo y el más cercano al contrato:
-      9 `enu` y 9 `act` pareados 1:1.
+        ASyS-utn-frm/python  (PÚBLICO)
+        ├── Laboratorios/        ← enunciados generados, se publican
+        ├── MNN_*.ipynb          ← módulos, siguen con el tooling viejo
+        └── _fuente/             ← repo privado, ignorado, NUNCA commitear
+            ├── .labconfig.yaml  ← enunciados: ../Laboratorios, prefijo "L"
+            ├── build.py         ← wrapper: expande @header y llama a lab_build
+            ├── sources/*.lab.md
+            ├── Soluciones/
+            └── rubricas/
 
-      El repo tiene su propio tooling, que conviene conocer antes de tocar:
+      Los paths de `layout:` de arriba están escritos relativos a la raíz del
+      repo PÚBLICO, que es lo que apunta paths.local.yaml. El .labconfig.yaml
+      real vive en `_fuente/` y usa paths relativos a él.
+
+      Ojo al mover archivos hacia `_fuente/`: `git mv` sobre un archivo ya
+      trackeado ignora el .gitignore y lo deja trackeado en el destino. Pasó
+      con rubrics/L00_rubric.md, que tenía las soluciones de referencia y
+      estaba publicado. Después de mover, verificar:
+          git ls-files | grep _fuente     # tiene que dar vacío
+
+      PENDIENTE: `_fuente/` es hoy un repo git local SIN REMOTO. Falta crear
+      el repo privado en GitHub y pushear; hasta entonces las fuentes de los
+      labs no tienen respaldo fuera del disco del docente.
+
+      Estado de los labs: L00 (migrado, 18 ítems) y L01 (nuevo, 19 ítems),
+      los dos con cero errores de validación y solución ejecutada con
+      outputs. Faltan L02..L07.
+
+      Ojo con la numeración: se renumeró el 2026-08-02 y ya NO hay lab de
+      números complejos (quedó diferido, con su scope completo, en el Anexo A
+      de docs/PROJECT_PLAN.md). El plan viejo de 9 labs no vale más. Orden
+      vigente: L00 práctica Python, L01 señales y operaciones, L02
+      convolución, L03 Fourier continuo, L04 Laplace, L05 muestreo, L06 FFT +
+      modulación, L07 transformada Z.
+
+      Los TP0..TP4 salieron del repo a `_legacy/` (ignorado). No validarlos
+      ni regenerarlos: son insumo de redacción, nada más.
+
+      Convivencia de toolchains: los MÓDULOS (MNN_*) siguen con el tooling
+      propio del repo, que conviene conocer antes de tocarlos:
 
         fuente única     src/*.md → tools/md2nb.py  (vs. .lab.md → lab_build.py)
         delimitador      `%% tipo id`               (vs. ::::cell{#id ...})
         roles            prefijo del id: prov /     (vs. sufijo del id:
                          act / enu / hdr                 ejN-code, ejN-enunciado)
         placeholder      `# TU CÓDIGO AQUÍ`         (vs. `# Tu código aquí`)
-        extracción       tools/extract_student.py   (vs. bloques `solution`)
-        rúbricas         rubrics/*.md en markdown   (vs. .rubric.yaml)
 
-      Dos huecos que hay que cubrir al escribir L01 en adelante (decidido
-      2026-08-02):
-        - Soluciones: no existen en el material viejo. Los labs nuevos se
-          escriben con enunciado y solución en el mismo .lab.md (bloques
-          `python solution` / `markdown solution`).
-        - Preguntas de análisis: SÍ van. El material viejo no tiene ese
-          rol; los labs nuevos llevan ejN-pregunta + ejN-respuesta.
+      Solo los laboratorios usan el contrato. docs/FORMATO_CELDAS.md quedó
+      marcado como "aplica solo a módulos".
 
-      Dos ideas de md2nb que a lab_build.py le faltan y valdría robar: la
-      directiva `@header` que embebe el logo en base64 (lab_build depende de
-      una URL de Imgur, que es frágil) y el `role` en la metadata de celda.
+      Idea de md2nb que a lab_build.py le seguiría faltando: el `role` en la
+      metadata de celda. La otra, la directiva `@header` que embebe el logo en
+      base64 (lab_build espera una URL, frágil y además invisible sin red),
+      quedó resuelta para esta materia con el wrapper `_fuente/build.py` —
+      vale la pena subirla al plugin.
 
   - id: pln
-    nombre: "Procesamiento del Lenguaje Natural"
-    repo: null
+    nombre: "Modelos de Lenguaje"
+    repo: "git@github.com:javovelez/Modelos-de-Lenguaje-fuente.git"
     contract_version: "1.0.0"
-    estado: por-arrancar
+    estado: activa
     layout:
       sources:    "sources"
       enunciados: "Laboratorios"
       soluciones: "Soluciones"
       rubricas:   "rubricas"
     notas: |
-      Materia nueva, sin repo todavía. Nace con el contrato: arrancar con
+      Materia nueva. Arrancada el 2026-08-10 con `materia_init.py`, así que
+      nace alineada al contrato, sin nada que migrar.
 
-        python <plugin>/scripts/materia_init.py <dir> \
-            --nombre "Procesamiento del Lenguaje Natural" --id pln
+      OJO CON EL ID: la materia se llama **Modelos de Lenguaje**. El id `pln`
+      viene de un nombre equivocado que se usó al arrancarla ("Procesamiento
+      del Lenguaje Natural"). El 2026-08-15 se corrigió el nombre visible en
+      todos lados y el 2026-08-16 se renombraron los dos repos, que ahora son
+      `Modelos-de-Lenguaje` y `Modelos-de-Lenguaje-fuente`. El id se dejó
+      en `pln` a propósito: es la clave de esta entrada y de los workdirs de
+      las correcciones ya hechas, y cambiarlo los rompe.
 
-      y después completar `repo` acá y la ruta en paths.local.yaml.
+      Estado de los labs: escritos el 1a (de texto a tensor, 19 ítems), el 1b
+      (modelo y entrenamiento, 20 ítems) y el 1c (embeddings, 21 ítems), los
+      tres con cero errores de validación. Faltan los labs 2 a 5.
+
+      Dos repos, patrón idéntico al de rnp (el público montado adentro del
+      privado):
+
+        Modelos-de-Lenguaje-fuente  (PRIVADO) ← lo que apunta paths.local.yaml
+        ├── sources/         ← .lab.md, con la solución adentro
+        ├── Soluciones/
+        ├── rubricas/
+        └── Laboratorios/    ← repo PÚBLICO javovelez/Modelos-de-Lenguaje,
+                                clonado adentro e ignorado por .gitignore
+
+      Los paths de `layout:` están escritos relativos a la raíz del repo
+      privado, que es donde vive el .labconfig.yaml.
+
+      Links de Colab contra el público:
+      https://colab.research.google.com/github/javovelez/Modelos-de-Lenguaje/blob/main/Laboratorio_N.ipynb
