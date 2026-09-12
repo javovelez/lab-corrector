@@ -25,7 +25,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
-MOODLE_FOLDER_RE = re.compile(r"^Grupo\s+(\d+)_\d+_assignsubmission_file$")
+# El espacio es opcional: el prefijo sale del nombre del grupo en Moodle,
+# que lo escribe el docente y a veces viene pegado ("Grupo11_4799_...").
+MOODLE_FOLDER_RE = re.compile(r"^Grupo\s*(\d+)_\d+_assignsubmission_file$")
 
 
 @dataclass

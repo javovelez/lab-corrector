@@ -86,10 +86,11 @@ zip" → botón "Importar". El intake:
 
 1. Descomprime el zip a un temp del SO.
 2. Lista subdirectorios. Si los nombres top-level matchean
-   `^Grupo \d+_\d+_assignsubmission_file$`, los toma directo. Si hay
-   un solo directorio en la raíz, baja un nivel y reintenta (Moodle a
-   veces empaqueta todo dentro de una carpeta con el nombre de la
-   entrega).
+   `^Grupo\s*\d+_\d+_assignsubmission_file$` (el espacio es opcional:
+   el prefijo sale del nombre del grupo en Moodle, que lo escribe el
+   docente y a veces viene pegado), los toma directo. Si hay un solo
+   directorio en la raíz, baja un nivel y reintenta (Moodle a veces
+   empaqueta todo dentro de una carpeta con el nombre de la entrega).
 3. Para cada carpeta de grupo:
    - Extrae `N` del prefijo `Grupo N_...`.
    - Renombra a `grupo_NN` (zero-padded a 2 dígitos).
