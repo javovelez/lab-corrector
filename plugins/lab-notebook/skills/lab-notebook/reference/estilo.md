@@ -382,9 +382,60 @@ Celda markdown final. Cell id: `footer`.
   | de un plumazo | de una sola vez |
   | tal cual | sin cambios, sin modificarlo |
   | basura, poquísimo, fortísimo | sin sentido, muy poco, muy fuerte |
+  | entrar (un dato al modelo) | ser la entrada de, ingresar a |
+  | meter (un dato, un índice) | pasar, representar |
+  | sacar del medio | descartar, excluir |
+  | bajar (un archivo) | descargar |
+  | anda / anda mejor | funciona / funciona mejor |
+  | de verdad (entrenarlo, cuánto sirve) | sobre el corpus real; cuánto aporta |
+  | la excusa, el pretexto | el medio, no el fin |
+  | dado vuelta | invertido |
+  | pegado a cero, lejísimos | muy cerca de cero, muy lejos |
+  | se lo lleva; le gana / le pierde | lo ocupa; supera / queda por debajo |
+  | se cae (la clase, la celda) | se interrumpe, falla |
+  | rankear | ubicar, ordenar |
+  | amontonado, desparramado, aplastado | agrupado, disperso, comprimido |
+  | chiquito, rarísimo, lejísimo | mínimo, muy raro, muy lejos |
+  | no tiene nada que ver con | no guarda relación con |
+  | la letra chica; cuánto hay que creerle | qué no dice; cuánta información conserva |
+
+  Los diminutivos y los superlativos en *-ísimo* son el caso más fácil de
+  detectar y el más frecuente: no hay ninguno que no tenga una forma técnica.
 
   La prueba es leerlo en voz alta como si lo dijera la cátedra en el pizarrón:
   lo que suene a conversación de pasillo se reemplaza.
+- **Es un texto académico de ingeniería: la imprecisión es un error, no un
+  matiz de estilo.** Bajar el registro coloquial no alcanza si la oración
+  resultante sigue diciendo algo aproximado. Cinco reglas:
+
+  1. **Cada cifra se atribuye a lo que la produjo**: qué modelo, sobre qué
+     partición, con cuántas clases. "Llega al 80% de *accuracy*" es una
+     afirmación sin sujeto, y es la vía por la que el número de un lab termina
+     citado en otro. Verificar contra la corrida, siempre.
+  2. **Las formas de los tensores se nombran por lo que son.** Una reseña es
+     una secuencia de $L$ índices; `(B, L)` es la forma del *lote*. Escribir
+     "cada reseña se convirtió en un tensor `(B, L)`" es directamente falso.
+  3. **El verbo nombra el mecanismo.** `nn.Embedding` *indexa* una tabla, no
+     "cambia" el índice ni "lo mete" en el modelo; el promedio *excluye las
+     posiciones de relleno*, no "ignora el relleno"; el entrenamiento *ajusta*
+     las filas, no las "acomoda".
+  4. **El cuantificador vago se reemplaza por la medida, cuando existe.** No
+     "muy por encima de las demás" sino "0,850 contra 0,59 del segundo
+     vecino"; no "casi todos" sino "siete de los ocho".
+  5. **Un término, un sentido, en todo el material.** El caso que ya costó una
+     ronda: en esta materia **"forma" es el *shape* de un tensor** —así la usa
+     el notebook de teoría, decenas de veces— así que no se la puede usar
+     además para "entrada del vocabulario". Una entrada del vocabulario es un
+     **token** (es lo que la teoría dice, y es lo correcto: `<pad>`, `<unk>`,
+     `42` y `xl` no son palabras); una ocurrencia en el texto es una
+     **aparición**; y "palabra" se reserva para cuando el objeto se trata como
+     palabra —sus vecinos, su polaridad, una fila por palabra—. Antes de
+     introducir un término, revisar con `grep` si ya está tomado en el
+     notebook de teoría.
+  6. **La voz es consistente**: impersonal en el material teórico ("se
+     normaliza cada fila"), segunda persona en las consignas ("normalizá cada
+     fila"). Mezclar "nos quedamos con" y "se conserva" en el mismo párrafo es
+     un defecto de redacción.
 - Los términos técnicos establecidos en inglés se mantienen en inglés y
   van en cursiva la primera vez que aparecen en una sección:
   *broadcasting*, *forward pass*, *overfitting*.
