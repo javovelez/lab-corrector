@@ -470,6 +470,41 @@ Celda markdown final. Cell id: `footer`.
 
   No es un error la enumeración («A, B y C») ni la «y» que une dos
   predicados del mismo sujeto («la celda descarga el corpus y lo divide»).
+- **La primera oración de un párrafo dice un hecho que se entiende sin leer
+  las siguientes.** La redacción por defecto abre el párrafo con una oración
+  que intenta encuadrarlo. Ese encuadre falla de dos maneras, y las dos se
+  repiten:
+
+  1. **La oración síntesis.** La oración resume el párrafo entero en una
+     fórmula que solo se entiende después de leerlo. «Un etiquetador de
+     entidades se mide contando entidades» no dice qué se cuenta, contra qué
+     se compara ni qué es un acierto. El lector la retiene sin poder
+     interpretarla.
+  2. **El contraste con lo que el lector ya sabe.** La oración junta dos
+     ideas con un «pero» para oponer la nueva a una conocida. «El etiquetador
+     asigna una etiqueta a cada palabra, pero su desempeño se mide por entidad
+     y no por palabra» mezcla qué hace el modelo con cómo se lo evalúa. La
+     primera mitad no aporta nada. La oposición queda afirmada sin explicarse.
+     Si el contraste importa, el párrafo lo muestra más adelante con un caso
+     concreto.
+
+  El arreglo es abrir con el primer hecho del razonamiento, en una oración
+  con una sola idea. Ese hecho dice qué se hace y con qué objetos.
+
+  El resto del párrafo presenta **el concepto antes que la herramienta que
+  lo implementa**. El orden es el hecho, la definición de cada término nuevo,
+  el caso que muestra la consecuencia y, al final, la función o la biblioteca
+  que lo calcula. En el caso que originó la regla, la función `medir`
+  aparecía en la segunda oración, antes de que el lector supiera qué tenía
+  que medir.
+
+  | dice | pasó a decir |
+  |---|---|
+  | Un etiquetador de entidades se mide contando entidades. La función `medir` extrae las entidades de las etiquetas de referencia y las de las etiquetas predichas. Cada entidad queda definida por su tipo, su primera palabra y su última palabra… | El desempeño del etiquetador se mide comparando las entidades predichas con las entidades de referencia. Una entidad queda definida por tres datos, que son su tipo, su primera palabra y su última palabra. Una entidad predicha es un acierto cuando una entidad de referencia tiene los mismos tres datos. Por eso una entidad reconocida a medias, por ejemplo con una palabra de menos, no es un acierto… La función `medir` (al final, en el párrafo de la implementación) |
+
+  La prueba es leer la primera oración de cada párrafo sola, tapando el
+  resto. Si no se puede decir qué afirma con precisión, o si afirma dos
+  cosas, se reescribe.
 
 ### Énfasis y formato inline
 
