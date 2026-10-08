@@ -173,6 +173,15 @@ alumno tiene que escribir.
 ¿La pregunta conceptual relacionada con el ejercicio?
 ```
 
+La pregunta es **preferentemente una sola**, conceptual y directa, sin
+incisos. Dos incisos son el tope, y el segundo se pone solo si de verdad
+vale la pena: cada `a)`/`b)` es un criterio más en la rúbrica y un texto más
+que se corrige en cada entrega. La pregunta **no es obligatoria**: si sale
+forzada, el ejercicio queda solo con el código, que la app corrige como un
+único ítem de código (`cell-ids.md`, *Ejercicio con código pero sin pregunta
+de análisis*). Si se saca una pregunta o un inciso, se saca también lo que
+la consigna construía solo para contestarlo.
+
 **Respuesta** (markdown, `ejN-respuesta`):
 
 ```markdown
@@ -318,7 +327,8 @@ no contesta ninguna sobra, y ahí hay dos salidas:
   al cierre del lab o a una explicación en prosa que no se corrige.
 - **Ampliar la pregunta.** Vale cuando lo que sobra es tan bueno que uno
   quiere que el alumno lo piense. Entonces se pide de manera explícita, y se
-  paga el costo de un ítem más — respetando el tope de dos incisos.
+  paga el costo de un inciso más — respetando el tope de dos incisos, y
+  solo si de verdad vale la pena.
 
 El caso inverso también se corrige tocando la pregunta: si la respuesta se va
 de largo porque la consigna encadenó cuatro pedidos en un inciso, el problema
