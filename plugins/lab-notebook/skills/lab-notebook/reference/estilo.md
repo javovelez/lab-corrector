@@ -454,6 +454,22 @@ Celda markdown final. Cell id: `footer`.
   una oración arranca con una construcción abstracta ("entre X y la primera
   capa hay una cadena de decisiones"), primero se dice concretamente de qué
   se trata y después se la nombra.
+- **No unir con «, y» dos oraciones con sujetos distintos.** Es la
+  construcción que más se repite en la redacción por defecto: un hecho, una
+  coma, una «y», y una segunda oración con otro sujeto que suele ser la causa,
+  el propósito o la consecuencia de la primera, cerrada muchas veces con un
+  pronombre como «cada una». La «y» no dice qué relación hay entre las dos
+  ideas. El pronombre del final puede referirse a más de un nombre. El
+  arreglo es partir la oración en dos y nombrar la relación entre las ideas
+  con el conector que corresponde («para», «porque», «por eso») o con el
+  orden.
+
+  | dice | pasó a decir |
+  |---|---|
+  | Una entidad puede ocupar varias palabras, y las etiquetas siguen el esquema BIO para marcar dónde empieza cada una. | Una entidad puede ocupar varias palabras. Para marcar en qué palabra empieza cada entidad, las etiquetas siguen el esquema BIO. |
+
+  No es un error la enumeración («A, B y C») ni la «y» que une dos
+  predicados del mismo sujeto («la celda descarga el corpus y lo divide»).
 
 ### Énfasis y formato inline
 
